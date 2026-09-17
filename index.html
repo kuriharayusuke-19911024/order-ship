@@ -151,6 +151,10 @@ a{color:var(--kuri-2)}
         <div class="f"><label>ステータス</label><select id="fStatus"></select></div>
       </div>
       <div class="f"><label>メモ・伝えたいこと</label><textarea id="fMemo" placeholder="例：熨斗あり／クール便で"></textarea></div>
+      <div class="f"><label>メールで来た注文はここに本文を貼る</label>
+        <textarea id="fMail" placeholder="注文メールの本文をコピーして貼り付け → 「読み取る」" style="min-height:60px"></textarea>
+        <button class="add" id="readMail" type="button" style="margin-top:6px">✉ メール本文を読み取る</button>
+      </div>
       <div class="f"><label>注文書（写真・PDF）</label>
         <div class="file">
           <label class="btn">📷 撮影する<input type="file" id="fCam" accept="image/*" capture="environment"></label>
@@ -292,7 +296,7 @@ $('addItem').onclick=()=>$('items').appendChild(itemRow());
 $('fAssignee').innerHTML='<option value="">未定</option>'+MEMBERS.map(m=>`<option>${m}</option>`).join('');
 $('fStatus').innerHTML=STATUS.map(s=>`<option>${s}</option>`).join('');
 function openForm(o){
-  pendingFile=null; $('fileName').textContent=''; $('fThumb').hidden=true;
+  pendingFile=null; $('fileName').textContent=''; $('fThumb').hidden=true; $('fMail').value='';
   $('formTitle').textContent=o?'注文を編集':'注文を登録';
   $('fId').value=o?.id||''; $('fDate').value=o?.orderDate||today(); $('fDue').value=o?.due||'';
   $('fCust').value=o?.customer||''; $('fShipTo').value=o?.shipTo||''; $('fAddr').value=o?.addr||'';
@@ -325,15 +329,25 @@ async function onFile(e){
   e.target.value='';
   if(pendingFile && API_URL) readOrder();
 }
+function applyRead(d){
+  const set=(id,v)=>{ if(v && !$(id).value) $(id).value=v; };
+  set('fDate',d.orderDate); set('fDue',d.due); set('fCust',d.customer); set('fShipTo',d.shipTo); set('fAddr',d.addr); set('fMemo',d.memo);
+  const cur=[...$('items').children].some(r=>r.querySelector('input').value.trim());
+  if(!cur && Array.isArray(d.items) && d.items.length){ $('items').innerHTML=''; d.items.forEach(it=>$('items').appendChild(itemRow(it))); }
+}
+$('readMail').onclick=async()=>{
+  const t=$('fMail').value.trim(); if(!t){ toast('メール本文を貼り付けてください'); return; }
+  if(!API_URL){ toast('API_URL未設定のため読み取りできません'); return; }
+  $('readMail').disabled=true; $('readMail').textContent='読み取り中…';
+  try{ const r=await api({action:'read',text:t}); applyRead(r.data||{}); toast('読み取りました。内容を確認してください'); }
+  catch(err){ console.error(err); toast('読み取りできませんでした：'+err.message); }
+  $('readMail').disabled=false; $('readMail').textContent='✉ メール本文を読み取る';
+};
 async function readOrder(){
   $('fileName').textContent=pendingFile.name+'　読み取り中…';
   try{
     const r=await api({action:'read',type:pendingFile.type,data:pendingFile.data.split(',')[1]});
-    const d=r.data||{};
-    const set=(id,v)=>{ if(v && !$(id).value) $(id).value=v; };
-    set('fDate',d.orderDate); set('fDue',d.due); set('fCust',d.customer); set('fShipTo',d.shipTo); set('fAddr',d.addr); set('fMemo',d.memo);
-    const cur=[...$('items').children].some(r=>r.querySelector('input').value.trim());
-    if(!cur && Array.isArray(d.items) && d.items.length){ $('items').innerHTML=''; d.items.forEach(it=>$('items').appendChild(itemRow(it))); }
+    applyRead(r.data||{});
     $('fileName').textContent=pendingFile.name+'　✓ 読み取りました。内容を確認してください';
   }catch(err){ console.error(err); $('fileName').textContent=pendingFile.name; toast('読み取りできませんでした：'+err.message+'（手入力で続けられます）'); }
 }
