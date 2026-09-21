@@ -282,7 +282,13 @@ function advance(id,dir){
   const o=orders.find(x=>x.id===id); const i=STATUS.indexOf(o.status)+dir; if(i<0||i>=STATUS.length) return;
   o.status=STATUS[i]; (o.history=o.history||[]).push({at:now(),by:me,to:o.status});
   saveOrder(o); toast(`「${o.status}」にしました`);
+  if(dir>0 && o.status==='発送依頼') notifyLine(o);
   if(!$('detail').hidden) openDetail(id);
+}
+async function notifyLine(o){
+  if(!API_URL || !o.assignee) return;
+  try{ const r=await api({action:'notify',order:o,by:me}); toast(r.skipped ? '通知なし：'+r.skipped : `${o.assignee}さんにLINEで通知しました`); }
+  catch(err){ console.error(err); toast('LINE通知できませんでした：'+err.message); }
 }
 
 // ===== 登録・編集 =====
@@ -372,6 +378,7 @@ $('save').onclick=async()=>{
       o.fileName=pendingFile.name; o.fileType=pendingFile.type;
     }
     saveOrder(o); $('form').hidden=true; toast(old?'保存しました':'注文を登録しました');
+    if(o.status==='発送依頼' && (!old || old.status!=='発送依頼' || old.assignee!==o.assignee)) notifyLine(o);
   }catch(err){ console.error(err); toast('保存に失敗：'+err.message); }
   $('save').disabled=false; $('save').textContent='保存する';
 };
