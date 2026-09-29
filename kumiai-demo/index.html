@@ -1,0 +1,1069 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>自給飼料 発注管理（お試し）</title>
+<style>
+:root{
+  --bg:#f4f2ec;--card:#fff;--ink:#1f2a22;--sub:#667066;--line:#dedbd2;
+  --pri:#2f5d3a;--pri-ink:#fff;--pri-soft:#e3ece4;--warn:#b5651d;--warn-soft:#f8ead9;
+  --ok:#2e7d4f;--ok-soft:#e1f1e7;--bad:#b3261e;--bad-soft:#f9e1df;--info:#2d5f8a;--info-soft:#e0ebf5;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141814;--card:#1d231e;--ink:#e8ece6;--sub:#9aa59b;--line:#323a33;
+  --pri:#7fb58c;--pri-ink:#0f1a12;--pri-soft:#243528;--warn:#e0a060;--warn-soft:#3a2c1c;
+  --ok:#7fcf9c;--ok-soft:#1f3326;--bad:#f08a82;--bad-soft:#3a201e;--info:#8cb8e0;--info-soft:#1c2a38;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141814;--card:#1d231e;--ink:#e8ece6;--sub:#9aa59b;--line:#323a33;
+  --pri:#7fb58c;--pri-ink:#0f1a12;--pri-soft:#243528;--warn:#e0a060;--warn-soft:#3a2c1c;
+  --ok:#7fcf9c;--ok-soft:#1f3326;--bad:#f08a82;--bad-soft:#3a201e;--info:#8cb8e0;--info-soft:#1c2a38;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;-webkit-text-size-adjust:100%}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--pri);color:var(--pri-ink);padding:10px 16px calc(10px);display:flex;align-items:center;gap:8px}
+header h1{font-size:16px;margin:0;flex:1;line-height:1.3}
+header small{display:block;font-weight:400;opacity:.85;font-size:12px}
+header button{background:transparent;border:1px solid currentColor;color:inherit;border-radius:8px;padding:4px 10px;font-size:13px}
+nav{display:flex;gap:4px;padding:8px 16px 0;overflow-x:auto;background:var(--bg);position:sticky;top:calc(56px + env(safe-area-inset-top,0px));z-index:4}
+nav button{flex:1 0 auto;border:0;background:transparent;color:var(--sub);padding:10px 8px;font-size:14px;border-bottom:3px solid transparent;font-size:15px;font-weight:600;white-space:nowrap}
+nav button.on{color:var(--pri);border-color:var(--pri)}
+main{max-width:760px;margin:0 auto;padding:12px 16px 80px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 12px}
+.card h3{margin:0 0 6px;font-size:16px}
+.muted{color:var(--sub);font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>*{min-width:0}
+.grow{flex:1}
+label{display:block;font-size:13px;color:var(--sub);margin:10px 0 4px}
+input,select,textarea{width:100%;font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+textarea{min-height:64px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:10px;padding:11px 16px;font:inherit;font-weight:700;background:var(--pri);color:var(--pri-ink);cursor:pointer}
+.btn.sub{background:var(--pri-soft);color:var(--pri)}
+.btn.warn{background:var(--warn-soft);color:var(--warn)}
+.btn.danger{background:var(--bad-soft);color:var(--bad)}
+.btn.sm{padding:6px 10px;font-size:13px;border-radius:8px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.5}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--pri-soft);color:var(--pri);white-space:nowrap}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.tag.info{background:var(--info-soft);color:var(--info)}
+.tag.bad{background:var(--bad-soft);color:var(--bad)}
+.big{font-size:22px;font-weight:800}
+.conv{background:var(--info-soft);color:var(--info);border-radius:10px;padding:10px 12px;margin-top:10px;font-weight:700}
+.alloc{border-top:1px dashed var(--line);padding-top:10px;margin-top:10px}
+.bar{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin:6px 0}
+.bar i{display:block;height:100%;background:var(--pri)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--sub);font-weight:600;font-size:12px}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tblwrap{overflow-x:auto}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--card);color:var(--ink);padding:9px 6px;font:inherit;font-size:14px}
+.seg button.on{background:var(--pri);color:var(--pri-ink);font-weight:700}
+.datechips{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.datechips button{border:2px solid var(--pri);background:var(--card);color:var(--pri);border-radius:10px;padding:10px 14px;font:inherit;font-weight:700}
+.empty{text-align:center;color:var(--sub);padding:30px 10px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:50;max-width:90vw}
+#toast.err{background:var(--bad);color:#fff}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:40;display:flex;align-items:flex-end;justify-content:center}
+#modal .sheet{background:var(--card);width:100%;max-width:560px;border-radius:16px 16px 0 0;padding:16px 16px 24px;max-height:90vh;overflow:auto}
+#modal h3{margin:0 0 8px}
+#busy{position:fixed;top:0;left:0;right:0;height:3px;background:var(--warn);z-index:60;animation:b 1s linear infinite}
+@keyframes b{0%{opacity:.3}50%{opacity:1}100%{opacity:.3}}
+.login{max-width:420px;margin:40px auto;padding:0 16px}
+.login h2{margin:0 0 4px;font-size:20px}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px}
+.sum .card{margin:0}
+.filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.filter button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:6px 12px;font:inherit;font-size:13px}
+.filter button.on{background:var(--pri);border-color:var(--pri);color:var(--pri-ink)}
+hr{border:0;border-top:1px solid var(--line);margin:14px 0}
+
+#demo{background:var(--warn-soft);color:var(--warn);padding:10px 16px;font-size:13px;line-height:1.5}
+#demo>b{display:block;font-size:14px}
+#guide{margin-top:10px;background:var(--card);color:var(--ink);border-radius:10px;padding:10px 12px}
+#guide summary{font-weight:700;color:var(--pri);cursor:pointer}
+#guide ol{padding-left:1.3em;margin:8px 0}
+#guide li{margin-bottom:4px}
+#guide dl{margin:8px 0}
+#guide dt{font-weight:700;margin-top:6px}
+#guide dd{margin:0;color:var(--sub)}
+#guide p{margin:8px 0 0;color:var(--sub)}
+#demo .qs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+#demo .qs button{border:1px solid currentColor;background:transparent;color:inherit;border-radius:99px;padding:5px 10px;font:inherit;font-size:13px;font-weight:700}
+@media (prefers-reduced-motion:reduce){#busy{animation:none}}
+</style>
+</head>
+<body>
+
+
+<div id="busy" hidden></div>
+<div id="demo"><b>お試し版（GASにはつながっていません）</b>データはこの画面の中だけで、再読み込みすると元に戻ります。下のボタンで立場を切り替えて、流れを確かめられます。
+<div class="qs" id="demoQs"></div><details id="guide" open><summary>使い方（3分で試せます）</summary>
+<ol>
+<li><b>農家A</b>を押す → 届いている候補日（2つ）のどちらかをタップして確定</li>
+<li><b>カワヨ担当</b>を押す →「引き取り予定」→「納品kgを入力」に実際の重さ（例：2310）を入れる</li>
+<li><b>栗原（事務局）</b>を押す →「納品・精算」で農家ごとの納品kgと金額を確認</li>
+<li>ほかにも試せること：カワヨ担当の「発注する」でkgを入れるとロール数が自動で出ます／事務局の「＋農家に振り分け」で、農家が登録した在庫から割り振れます</li>
+</ol>
+<dl>
+<dt>事務局（碓永さん・栗原）</dt><dd>発注を見て農家に振り分け。全農家の在庫・精算・設定（品目、1ロールの重さ、kg単価、手数料）が見られます</dd>
+<dt>カワヨ</dt><dd>品目とkgで発注 → 引き取り候補日を入れる → 実際の納品kgを入力</dd>
+<dt>農家</dt><dd>出せるロール数を登録 → 候補日から都合のいい日を選ぶ。積み込み（農家が積む／カワヨがフォークで積む）もここで選べます。ほかの農家の数字は見えません</dd>
+</dl>
+<p>本番では、各自が自分の名前と4桁の暗証番号でログインし、振り分けや日程確定がLINEに通知されます。</p>
+</details></div>
+<div id="app"></div>
+<div id="toast" hidden></div>
+<div id="modal" hidden><div class="sheet" id="sheet"></div></div>
+
+<script>
+/* ===== お試し版：GASの代わりにブラウザの中で同じ処理を動かす（保存はされない） ===== */
+(function(){
+  const sheets={};
+  function mk(){const d=[];return{getLastRow(){return d.length},getRange(r,c,nr,nc){return{
+    setValues(v){v.forEach((row,i)=>{d[r-1+i]=d[r-1+i]||[];row.forEach((x,j)=>d[r-1+i][c-1+j]=x)})},
+    getValues(){const o=[];for(let i=0;i<nr;i++){const row=[];for(let j=0;j<nc;j++){const v=(d[r-1+i]||[])[c-1+j];row.push(v==null?'':v)}o.push(row)}return o},
+    clearContent(){for(let i=0;i<nr;i++)for(let j=0;j<nc;j++)if(d[r-1+i])d[r-1+i][c-1+j]='';while(d.length&&d[d.length-1].every(x=>x===''))d.pop()},
+    setNumberFormat(){return this}}}}}
+  const SpreadsheetApp={getActiveSpreadsheet:()=>({getSheetByName:n=>sheets[n],insertSheet:n=>(sheets[n]=mk())})};
+  const LockService={getScriptLock:()=>({waitLock(){},releaseLock(){}})};
+  const ContentService={MimeType:{JSON:'j'},createTextOutput:t=>({t,setMimeType(){return this}})};
+  let n=0;
+  const Utilities={getUuid:()=>'id'+(++n)+Math.random().toString(16).slice(2,10),
+    formatDate:(d,tz,f)=>{const x=new Date(d.getTime()+9*3600e3).toISOString();return f==='yyyy-MM-dd'?x.slice(0,10):x.slice(0,16).replace('T',' ')}};
+  const PropertiesService={getScriptProperties:()=>({getProperty:()=>null})};
+  const UrlFetchApp={fetch(){}};
+  /**
+ * 兵庫県自給飼料生産組合 発注管理アプリ（GAS）
+ * スプレッドシートに紐づけて「ウェブアプリ」としてデプロイする
+ *  - 実行ユーザー：自分 / アクセス：全員
+ * スクリプトプロパティ（任意）
+ *  - LINE_TOKEN : LINE公式アカウントのチャネルアクセストークン（通知を使う場合）
+ *  - APP_URL    : アプリの公開URL（通知の末尾にリンクを付ける）
+ */
+
+const DEFAULTS = {
+  admin: { name: '栗原', pin: '1129' },
+  settings: { kumiaiName: '兵庫県自給飼料生産組合', buyerName: '西日本カワヨ株式会社', feePerKg: '' },
+  items: [['スーダンソルゴー', 450], ['イタリアン', 300], ['麦わら', 150], ['わら', 100]]
+};
+
+const TABLES = {
+  users:    ['id', 'name', 'role', 'pin', 'loader', 'lineUserId', 'active', 'createdAt'],
+  items:    ['id', 'name', 'kgPerRoll', 'unitPrice', 'active', 'sort'],
+  stocks:   ['id', 'farmerId', 'itemId', 'rolls', 'note', 'updatedAt'],
+  orders:   ['id', 'itemId', 'kg', 'dueDate', 'note', 'createdBy', 'createdAt', 'cancelled'],
+  allocs:   ['id', 'orderId', 'farmerId', 'rolls', 'candidates', 'date', 'loader', 'deliveredKg', 'deliveredAt', 'status', 'updatedAt'],
+  settings: ['key', 'value']
+};
+const JSON_COLS = { allocs: ['candidates'] };
+const ROLE_LABEL = { admin: '事務局', buyer: '引き取り側', farmer: '農家' };
+const ST = { ALLOC: '振り分け済', PROPOSED: '候補日提示', FIXED: '日程確定', DONE: '納品済' };
+
+/* ---------- 入口 ---------- */
+function doGet() {
+  return ContentService.createTextOutput('OK: 自給飼料 発注管理 GAS');
+}
+
+function doPost(e) {
+  let body = {};
+  try { body = JSON.parse(e.postData.contents || '{}'); } catch (err) { return out_({ ok: false, error: '不正なリクエスト' }); }
+  if (body.events) { lineWebhook_(body); return out_({ ok: true }); }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  let res, msgs = [];
+  try {
+    const D = load_();
+    const dirty = ensureInit_(D);
+    if (body.action === 'names') {
+      if (dirty.length) save_(D, dirty);
+      res = { ok: true, data: namesList_(D) };
+    } else {
+      const me = auth_(D, body);
+      const ctx = { D, me, msgs, dirty: new Set(dirty) };
+      if (body.action !== 'state') {
+        const fn = ACTIONS[body.action];
+        if (!fn) throw new Error('不明な操作です');
+        fn(ctx, body);
+      }
+      if (ctx.dirty.size) save_(D, [...ctx.dirty]);
+      res = { ok: true, data: view_(D, me) };
+    }
+  } catch (err) {
+    res = { ok: false, error: String(err.message || err) };
+    msgs = [];
+  } finally {
+    lock.releaseLock();
+  }
+  try { sendAll_(msgs); } catch (err) { /* 通知失敗は本体に影響させない */ }
+  return out_(res);
+}
+
+function out_(o) {
+  return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/* ---------- 保存 ---------- */
+function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
+function sheet_(t) {
+  let sh = ss_().getSheetByName(t);
+  if (!sh) {
+    sh = ss_().insertSheet(t);
+    sh.getRange(1, 1, 1, TABLES[t].length).setValues([TABLES[t]]);
+  }
+  return sh;
+}
+function read_(t) {
+  const sh = sheet_(t), cols = TABLES[t], n = sh.getLastRow();
+  if (n < 2) return [];
+  const jc = JSON_COLS[t] || [];
+  return sh.getRange(2, 1, n - 1, cols.length).getValues()
+    .filter(r => r[0] !== '')
+    .map(r => {
+      const o = {};
+      cols.forEach((c, i) => {
+        let v = r[i];
+        if (v instanceof Date) v = Utilities.formatDate(v, 'Asia/Tokyo', 'yyyy-MM-dd');
+        if (jc.includes(c)) { try { v = v ? JSON.parse(v) : []; } catch (err) { v = []; } }
+        else v = v == null ? '' : String(v);
+        o[c] = v;
+      });
+      return o;
+    });
+}
+function write_(t, rows) {
+  const sh = sheet_(t), cols = TABLES[t], n = sh.getLastRow();
+  const jc = JSON_COLS[t] || [];
+  if (n > 1) sh.getRange(2, 1, n - 1, cols.length).clearContent();
+  if (!rows.length) return;
+  const rg = sh.getRange(2, 1, rows.length, cols.length);
+  rg.setNumberFormat('@');
+  rg.setValues(rows.map(o => cols.map(c => {
+    const v = o[c];
+    if (jc.includes(c)) return JSON.stringify(v || []);
+    return v == null ? '' : String(v);
+  })));
+}
+function load_() {
+  const D = {};
+  Object.keys(TABLES).forEach(t => D[t] = read_(t));
+  return D;
+}
+function save_(D, tables) { tables.forEach(t => write_(t, D[t])); }
+
+function ensureInit_(D) {
+  const dirty = [];
+  if (!D.users.length) {
+    D.users.push({ id: id_(), name: DEFAULTS.admin.name, role: 'admin', pin: DEFAULTS.admin.pin, loader: 'farmer', lineUserId: '', active: 'true', createdAt: now_() });
+    dirty.push('users');
+  }
+  if (!D.items.length) {
+    DEFAULTS.items.forEach(([name, kg], i) => D.items.push({ id: id_(), name, kgPerRoll: String(kg), unitPrice: '', active: 'true', sort: String(i + 1) }));
+    dirty.push('items');
+  }
+  const keys = D.settings.map(s => s.key);
+  let sd = false;
+  Object.keys(DEFAULTS.settings).forEach(k => { if (!keys.includes(k)) { D.settings.push({ key: k, value: DEFAULTS.settings[k] }); sd = true; } });
+  if (sd) dirty.push('settings');
+  return dirty;
+}
+
+/* ---------- 共通 ---------- */
+function id_() { return Utilities.getUuid().replace(/-/g, '').slice(0, 10); }
+function now_() { return Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd HH:mm'); }
+function num_(v) { return v === '' || v == null ? null : Number(v); }
+function isDate_(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
+function md_(s) { return isDate_(s) ? Number(s.slice(5, 7)) + '/' + Number(s.slice(8, 10)) : '未定'; }
+function active_(u) { return String(u.active) !== 'false'; }
+function settings_(D) { const o = {}; D.settings.forEach(s => o[s.key] = s.value); return o; }
+function item_(D, id) { const it = D.items.find(i => i.id === id); if (!it) throw new Error('品目が見つかりません'); return it; }
+function user_(D, id) { return D.users.find(u => u.id === id); }
+function need_(ctx, ...roles) { if (!roles.includes(ctx.me.role)) throw new Error('この操作はできません'); }
+function mark_(ctx, ...t) { t.forEach(x => ctx.dirty.add(x)); }
+function roleIds_(D, role) { return D.users.filter(u => u.role === role && active_(u)).map(u => u.id); }
+function notify_(ctx, ids, text) { ctx.msgs.push({ ids: ids.filter(Boolean), text }); }
+function buyerShort_(D) { return String(settings_(D).buyerName || '引き取り側').replace(/株式会社|（株）|\(株\)/g, '').trim(); }
+function loaderLabel_(D, v) { return v === 'buyer' ? buyerShort_(D) + 'がフォークリフトで積む' : '農家が積む'; }
+function intPos_(v, label) {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n <= 0) throw new Error(label + 'は1以上の整数で入力してください');
+  return n;
+}
+
+function namesList_(D) {
+  const order = { admin: 0, buyer: 1, farmer: 2 };
+  return D.users.filter(active_)
+    .map(u => ({ id: u.id, name: u.name, role: u.role }))
+    .sort((a, b) => order[a.role] - order[b.role] || a.name.localeCompare(b.name, 'ja'));
+}
+
+function auth_(D, b) {
+  const a = b.auth || {};
+  const u = D.users.find(x => x.id === a.uid && active_(x));
+  if (!u || String(u.pin) !== String(a.pin || '')) throw new Error('名前か暗証番号が違います');
+  return u;
+}
+
+/* ---------- 役割ごとに見せるデータ ---------- */
+function view_(D, me) {
+  const S = settings_(D);
+  const items = D.items.map(i => ({ id: i.id, name: i.name, kgPerRoll: num_(i.kgPerRoll), unitPrice: num_(i.unitPrice), active: String(i.active) !== 'false', sort: num_(i.sort) }))
+    .sort((a, b) => (a.sort || 0) - (b.sort || 0));
+  const meOut = { id: me.id, name: me.name, role: me.role, loader: me.loader || 'farmer', linked: !!me.lineUserId };
+  const alloc = a => ({ id: a.id, orderId: a.orderId, farmerId: a.farmerId, rolls: Number(a.rolls), candidates: a.candidates || [], date: a.date, loader: a.loader, deliveredKg: num_(a.deliveredKg), deliveredAt: a.deliveredAt, status: a.status });
+  const order = o => ({ id: o.id, itemId: o.itemId, kg: Number(o.kg), dueDate: o.dueDate, note: o.note, createdAt: o.createdAt, cancelled: o.cancelled === '1' });
+  const base = { me: meOut, settings: { kumiaiName: S.kumiaiName, buyerName: S.buyerName } };
+
+  if (me.role === 'admin') {
+    return Object.assign(base, {
+      settings: { kumiaiName: S.kumiaiName, buyerName: S.buyerName, feePerKg: num_(S.feePerKg) },
+      items,
+      users: D.users.filter(active_).map(u => ({ id: u.id, name: u.name, role: u.role, pin: u.pin, loader: u.loader || 'farmer', linked: !!u.lineUserId })),
+      stocks: D.stocks.map(s => ({ id: s.id, farmerId: s.farmerId, itemId: s.itemId, rolls: Number(s.rolls), note: s.note, updatedAt: s.updatedAt })),
+      orders: D.orders.map(order),
+      allocs: D.allocs.map(alloc)
+    });
+  }
+  if (me.role === 'buyer') {
+    return Object.assign(base, {
+      items: items.map(i => ({ id: i.id, name: i.name, kgPerRoll: i.kgPerRoll, active: i.active, sort: i.sort })),
+      users: D.users.filter(u => u.role === 'farmer').map(u => ({ id: u.id, name: u.name, role: u.role })),
+      orders: D.orders.map(order),
+      allocs: D.allocs.map(alloc)
+    });
+  }
+  // 農家：自分の分だけ
+  const mine = D.allocs.filter(a => a.farmerId === me.id);
+  const oids = new Set(mine.map(a => a.orderId));
+  return Object.assign(base, {
+    items: items.map(i => ({ id: i.id, name: i.name, kgPerRoll: i.kgPerRoll, active: i.active, sort: i.sort })),
+    users: [{ id: me.id, name: me.name, role: me.role }],
+    stocks: D.stocks.filter(s => s.farmerId === me.id).map(s => ({ id: s.id, farmerId: s.farmerId, itemId: s.itemId, rolls: Number(s.rolls), note: s.note, updatedAt: s.updatedAt })),
+    orders: D.orders.filter(o => oids.has(o.id)).map(o => ({ id: o.id, itemId: o.itemId, dueDate: o.dueDate, cancelled: o.cancelled === '1' })),
+    allocs: mine.map(alloc)
+  });
+}
+
+/* ---------- 在庫（出せるロール数） ---------- */
+function stockOf_(D, farmerId, itemId) { return D.stocks.find(s => s.farmerId === farmerId && s.itemId === itemId); }
+function addStock_(ctx, farmerId, itemId, delta) {
+  let s = stockOf_(ctx.D, farmerId, itemId);
+  if (!s) { s = { id: id_(), farmerId, itemId, rolls: '0', note: '', updatedAt: now_() }; ctx.D.stocks.push(s); }
+  s.rolls = String(Number(s.rolls) + delta);
+  s.updatedAt = now_();
+  mark_(ctx, 'stocks');
+}
+
+/* ---------- 操作 ---------- */
+const ACTIONS = {
+  saveStock(ctx, p) {
+    need_(ctx, 'farmer', 'admin');
+    const farmerId = ctx.me.role === 'farmer' ? ctx.me.id : p.farmerId;
+    const f = user_(ctx.D, farmerId);
+    if (!f || f.role !== 'farmer') throw new Error('農家を選んでください');
+    item_(ctx.D, p.itemId);
+    const rolls = Number(p.rolls);
+    if (!Number.isInteger(rolls) || rolls < 0) throw new Error('ロール数は0以上の整数で入力してください');
+    let s = stockOf_(ctx.D, farmerId, p.itemId);
+    if (!s) { s = { id: id_(), farmerId, itemId: p.itemId }; ctx.D.stocks.push(s); }
+    s.rolls = String(rolls); s.note = String(p.note || ''); s.updatedAt = now_();
+    mark_(ctx, 'stocks');
+  },
+  deleteStock(ctx, p) {
+    need_(ctx, 'farmer', 'admin');
+    const s = ctx.D.stocks.find(x => x.id === p.id);
+    if (!s || (ctx.me.role === 'farmer' && s.farmerId !== ctx.me.id)) throw new Error('見つかりません');
+    ctx.D.stocks = ctx.D.stocks.filter(x => x.id !== p.id);
+    mark_(ctx, 'stocks');
+  },
+
+  createOrder(ctx, p) {
+    need_(ctx, 'buyer', 'admin');
+    const it = item_(ctx.D, p.itemId);
+    const kg = Number(p.kg);
+    if (!(kg > 0)) throw new Error('kgを入力してください');
+    if (p.dueDate && !isDate_(p.dueDate)) throw new Error('納期の日付が正しくありません');
+    const o = { id: id_(), itemId: it.id, kg: String(kg), dueDate: p.dueDate || '', note: String(p.note || ''), createdBy: ctx.me.id, createdAt: now_(), cancelled: '' };
+    ctx.D.orders.push(o);
+    mark_(ctx, 'orders');
+    const r = Math.round(kg / Number(it.kgPerRoll) * 10) / 10;
+    notify_(ctx, roleIds_(ctx.D, 'admin'), `【新しい発注】${settings_(ctx.D).buyerName}\n${it.name} ${kg.toLocaleString()}kg（約${r}ロール）\n納期：${md_(o.dueDate)}\n→ 農家への振り分けをお願いします`);
+  },
+  cancelOrder(ctx, p) {
+    need_(ctx, 'buyer', 'admin');
+    const o = ctx.D.orders.find(x => x.id === p.id);
+    if (!o || o.cancelled === '1') throw new Error('見つかりません');
+    const al = ctx.D.allocs.filter(a => a.orderId === o.id);
+    if (al.some(a => a.status === ST.DONE)) throw new Error('納品済みの分があるため取り消せません');
+    const it = item_(ctx.D, o.itemId);
+    al.forEach(a => {
+      addStock_(ctx, a.farmerId, o.itemId, Number(a.rolls));
+      notify_(ctx, [a.farmerId], `【取り消し】${it.name} ${a.rolls}ロールの引き取りは取り消しになりました`);
+    });
+    ctx.D.allocs = ctx.D.allocs.filter(a => a.orderId !== o.id);
+    o.cancelled = '1';
+    mark_(ctx, 'orders', 'allocs');
+    notify_(ctx, roleIds_(ctx.D, 'admin').concat(roleIds_(ctx.D, 'buyer')).filter(x => x !== ctx.me.id), `【発注取り消し】${it.name} ${Number(o.kg).toLocaleString()}kg の発注が取り消されました`);
+  },
+
+  allocate(ctx, p) {
+    need_(ctx, 'admin');
+    const o = ctx.D.orders.find(x => x.id === p.orderId);
+    if (!o || o.cancelled === '1') throw new Error('発注が見つかりません');
+    const f = user_(ctx.D, p.farmerId);
+    if (!f || f.role !== 'farmer' || !active_(f)) throw new Error('農家を選んでください');
+    const rolls = intPos_(p.rolls, 'ロール数');
+    const s = stockOf_(ctx.D, f.id, o.itemId);
+    const have = s ? Number(s.rolls) : 0;
+    if (rolls > have) throw new Error(`${f.name}さんの登録は${have}ロールです`);
+    const loader = p.loader === 'buyer' || p.loader === 'farmer' ? p.loader : (f.loader || 'farmer');
+    addStock_(ctx, f.id, o.itemId, -rolls);
+    ctx.D.allocs.push({ id: id_(), orderId: o.id, farmerId: f.id, rolls: String(rolls), candidates: [], date: '', loader, deliveredKg: '', deliveredAt: '', status: ST.ALLOC, updatedAt: now_() });
+    mark_(ctx, 'allocs');
+    const it = item_(ctx.D, o.itemId), bs = buyerShort_(ctx.D);
+    notify_(ctx, [f.id], `【振り分け】${it.name} ${rolls}ロールをお願いします\n積み込み：${loaderLabel_(ctx.D, loader)}\n${bs}さんから引き取りの候補日が届きます`);
+    notify_(ctx, roleIds_(ctx.D, 'buyer'), `【振り分け】${f.name}さん：${it.name} ${rolls}ロール\n→ 引き取りの候補日を入力してください`);
+  },
+  deleteAlloc(ctx, p) {
+    need_(ctx, 'admin');
+    const a = ctx.D.allocs.find(x => x.id === p.id);
+    if (!a) throw new Error('見つかりません');
+    if (a.status === ST.DONE) throw new Error('納品済みのため取り消せません');
+    const o = ctx.D.orders.find(x => x.id === a.orderId);
+    addStock_(ctx, a.farmerId, o.itemId, Number(a.rolls));
+    ctx.D.allocs = ctx.D.allocs.filter(x => x.id !== a.id);
+    mark_(ctx, 'allocs');
+    notify_(ctx, [a.farmerId], `【取り消し】${item_(ctx.D, o.itemId).name} ${a.rolls}ロールの振り分けは取り消しになりました`);
+    if (a.status === ST.PROPOSED || a.status === ST.FIXED) notify_(ctx, roleIds_(ctx.D, 'buyer'), `【取り消し】${user_(ctx.D, a.farmerId).name}さんの${a.rolls}ロールの引き取りは取り消しになりました`);
+  },
+  proposeDates(ctx, p) {
+    need_(ctx, 'buyer', 'admin');
+    const a = ctx.D.allocs.find(x => x.id === p.id);
+    if (!a || a.status === ST.DONE) throw new Error('見つかりません');
+    const c = [...new Set((p.candidates || []).filter(isDate_))].sort().slice(0, 3);
+    if (!c.length) throw new Error('候補日を1つ以上入れてください');
+    a.candidates = c; a.date = ''; a.status = ST.PROPOSED; a.updatedAt = now_();
+    mark_(ctx, 'allocs');
+    const it = item_(ctx.D, ctx.D.orders.find(o => o.id === a.orderId).itemId);
+    notify_(ctx, [a.farmerId], `【引き取り候補日】${it.name} ${a.rolls}ロール\n${c.map(md_).join('・')}\n→ アプリで都合のいい日を選んでください`);
+  },
+  pickDate(ctx, p) {
+    need_(ctx, 'farmer', 'admin');
+    const a = ctx.D.allocs.find(x => x.id === p.id);
+    if (!a || (ctx.me.role === 'farmer' && a.farmerId !== ctx.me.id)) throw new Error('見つかりません');
+    if (a.status === ST.DONE) throw new Error('納品済みです');
+    if (!isDate_(p.date)) throw new Error('日付を選んでください');
+    if (ctx.me.role === 'farmer' && !(a.candidates || []).includes(p.date)) throw new Error('候補日から選んでください');
+    a.date = p.date; a.status = ST.FIXED; a.updatedAt = now_();
+    mark_(ctx, 'allocs');
+    const it = item_(ctx.D, ctx.D.orders.find(o => o.id === a.orderId).itemId);
+    const f = user_(ctx.D, a.farmerId);
+    const text = `【引き取り日 確定】${md_(p.date)}\n${f.name}さん：${it.name} ${a.rolls}ロール\n積み込み：${loaderLabel_(ctx.D, a.loader)}`;
+    notify_(ctx, roleIds_(ctx.D, 'buyer').concat(roleIds_(ctx.D, 'admin')).concat([a.farmerId]).filter(x => x !== ctx.me.id), text);
+  },
+  setLoader(ctx, p) {
+    need_(ctx, 'farmer', 'buyer', 'admin');
+    const a = ctx.D.allocs.find(x => x.id === p.id);
+    if (!a || (ctx.me.role === 'farmer' && a.farmerId !== ctx.me.id)) throw new Error('見つかりません');
+    if (a.status === ST.DONE) throw new Error('納品済みです');
+    if (p.loader !== 'farmer' && p.loader !== 'buyer') throw new Error('積み込み担当を選んでください');
+    if (a.loader === p.loader) return;
+    a.loader = p.loader; a.updatedAt = now_();
+    mark_(ctx, 'allocs');
+    const f = user_(ctx.D, a.farmerId);
+    const text = `【積み込み担当の変更】${f.name}さんの${a.rolls}ロール（${md_(a.date)}）\n→ ${loaderLabel_(ctx.D, a.loader)}`;
+    const to = ctx.me.role === 'farmer' ? roleIds_(ctx.D, 'buyer') : [a.farmerId].concat(ctx.me.role === 'admin' ? roleIds_(ctx.D, 'buyer') : []);
+    notify_(ctx, to, text);
+  },
+  deliver(ctx, p) {
+    need_(ctx, 'buyer', 'admin');
+    const a = ctx.D.allocs.find(x => x.id === p.id);
+    if (!a) throw new Error('見つかりません');
+    if (ctx.me.role === 'buyer' && a.status !== ST.FIXED) throw new Error('引き取り日が確定してから入力してください');
+    const kg = Number(p.kg);
+    if (!(kg > 0)) throw new Error('納品kgを入力してください');
+    a.deliveredKg = String(kg); a.deliveredAt = now_(); a.status = ST.DONE; a.updatedAt = now_();
+    if (!a.date) a.date = a.deliveredAt.slice(0, 10);
+    mark_(ctx, 'allocs');
+    const it = item_(ctx.D, ctx.D.orders.find(o => o.id === a.orderId).itemId);
+    const f = user_(ctx.D, a.farmerId);
+    notify_(ctx, roleIds_(ctx.D, 'admin').concat([a.farmerId]).filter(x => x !== ctx.me.id), `【納品】${f.name}さん：${it.name} ${a.rolls}ロール\n納品量 ${kg.toLocaleString()}kg（${md_(a.date)}）`);
+  },
+
+  /* 事務局：設定 */
+  saveUser(ctx, p) {
+    need_(ctx, 'admin');
+    const name = String(p.name || '').trim();
+    if (!name) throw new Error('名前を入れてください');
+    if (!['admin', 'buyer', 'farmer'].includes(p.role)) throw new Error('役割を選んでください');
+    if (!/^\d{4}$/.test(String(p.pin || ''))) throw new Error('暗証番号は4桁の数字にしてください');
+    if (ctx.D.users.some(u => active_(u) && u.name === name && u.id !== p.id)) throw new Error('同じ名前の人がいます');
+    let u = p.id ? ctx.D.users.find(x => x.id === p.id) : null;
+    if (p.id && !u) throw new Error('見つかりません');
+    if (u && u.role === 'admin' && p.role !== 'admin' && roleIds_(ctx.D, 'admin').length <= 1) throw new Error('事務局が1人もいなくなります');
+    if (!u) { u = { id: id_(), lineUserId: '', active: 'true', createdAt: now_() }; ctx.D.users.push(u); }
+    u.name = name; u.role = p.role; u.pin = String(p.pin); u.loader = p.loader === 'buyer' ? 'buyer' : 'farmer';
+    mark_(ctx, 'users');
+  },
+  deleteUser(ctx, p) {
+    need_(ctx, 'admin');
+    const u = ctx.D.users.find(x => x.id === p.id);
+    if (!u) throw new Error('見つかりません');
+    if (u.id === ctx.me.id) throw new Error('自分は削除できません');
+    if (u.role === 'admin' && roleIds_(ctx.D, 'admin').length <= 1) throw new Error('事務局が1人もいなくなります');
+    if (ctx.D.allocs.some(a => a.farmerId === u.id && a.status !== ST.DONE)) throw new Error('進行中の引き取りがあるため削除できません');
+    u.active = 'false';
+    mark_(ctx, 'users');
+  },
+  saveItem(ctx, p) {
+    need_(ctx, 'admin');
+    const name = String(p.name || '').trim();
+    if (!name) throw new Error('品目名を入れてください');
+    const kpr = Number(p.kgPerRoll);
+    if (!(kpr > 0)) throw new Error('1ロールの重さを入れてください');
+    const price = p.unitPrice === '' || p.unitPrice == null ? '' : Number(p.unitPrice);
+    if (price !== '' && !(price >= 0)) throw new Error('kg単価が正しくありません');
+    let it = p.id ? ctx.D.items.find(x => x.id === p.id) : null;
+    if (p.id && !it) throw new Error('見つかりません');
+    if (!it) { it = { id: id_(), sort: String(ctx.D.items.length + 1) }; ctx.D.items.push(it); }
+    it.name = name; it.kgPerRoll = String(kpr); it.unitPrice = String(price); it.active = p.active === false ? 'false' : 'true';
+    mark_(ctx, 'items');
+  },
+  saveSettings(ctx, p) {
+    need_(ctx, 'admin');
+    const fee = p.feePerKg === '' || p.feePerKg == null ? '' : Number(p.feePerKg);
+    if (fee !== '' && !(fee >= 0)) throw new Error('手数料が正しくありません');
+    const set = (k, v) => { const s = ctx.D.settings.find(x => x.key === k); if (s) s.value = v; else ctx.D.settings.push({ key: k, value: v }); };
+    set('kumiaiName', String(p.kumiaiName || '').trim() || DEFAULTS.settings.kumiaiName);
+    set('buyerName', String(p.buyerName || '').trim() || DEFAULTS.settings.buyerName);
+    set('feePerKg', String(fee));
+    mark_(ctx, 'settings');
+  }
+};
+
+/* ---------- LINE ---------- */
+function sendAll_(msgs) {
+  if (!msgs.length) return;
+  const token = PropertiesService.getScriptProperties().getProperty('LINE_TOKEN');
+  if (!token) return;
+  const url = PropertiesService.getScriptProperties().getProperty('APP_URL');
+  const users = read_('users');
+  msgs.forEach(m => {
+    const to = [...new Set(m.ids)].map(id => users.find(u => u.id === id)).filter(u => u && u.lineUserId && active_(u)).map(u => u.lineUserId);
+    if (!to.length) return;
+    const text = m.text + (url ? '\n\n' + url : '');
+    to.forEach(uid => linePost_(token, 'push', { to: uid, messages: [{ type: 'text', text }] }));
+  });
+}
+function linePost_(token, kind, payload) {
+  UrlFetchApp.fetch('https://api.line.me/v2/bot/message/' + kind, {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + token }, payload: JSON.stringify(payload)
+  });
+}
+// 友だち追加後に「名前 暗証番号」（例：栗原 1234）を送ると通知先として登録される
+function lineWebhook_(body) {
+  const token = PropertiesService.getScriptProperties().getProperty('LINE_TOKEN');
+  if (!token) return;
+  (body.events || []).forEach(ev => {
+    if (ev.type === 'follow') {
+      linePost_(token, 'reply', { replyToken: ev.replyToken, messages: [{ type: 'text', text: '友だち追加ありがとうございます。\n通知を受け取るには「名前 暗証番号」を送ってください（例：栗原 1234）' }] });
+      return;
+    }
+    if (ev.type !== 'message' || ev.message.type !== 'text') return;
+    const t = ev.message.text.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/　/g, ' ').trim();
+    const m = t.match(/^(.+?)\s+(\d{4})$/);
+    let reply = '通知を受け取るには「名前 暗証番号」を送ってください（例：栗原 1234）';
+    if (m) {
+      const lock = LockService.getScriptLock();
+      lock.waitLock(20000);
+      try {
+        const users = read_('users');
+        const u = users.find(x => active_(x) && x.name === m[1].trim() && String(x.pin) === m[2]);
+        if (u) {
+          u.lineUserId = ev.source.userId;
+          write_('users', users);
+          reply = `${u.name}さん、登録しました。これから通知が届きます。`;
+        } else {
+          reply = '名前か暗証番号が違います。もう一度送ってください。';
+        }
+      } finally { lock.releaseLock(); }
+    }
+    linePost_(token, 'reply', { replyToken: ev.replyToken, messages: [{ type: 'text', text: reply }] });
+  });
+}
+
+  window.__demoPost=b=>JSON.parse(doPost({postData:{contents:JSON.stringify(b)}}).t);
+})();
+function demoSeed(){
+  const P=window.__demoPost, names=P({action:'names'}).data, adm={uid:names[0].id,pin:'1129'};
+  const call=(action,x,a)=>P(Object.assign({action,auth:a||adm},x)).data;
+  let S=call('saveUser',{name:'カワヨ担当（お試し）',role:'buyer',pin:'1111'});
+  S=call('saveUser',{name:'農家A（お試し）',role:'farmer',pin:'2222',loader:'buyer'});
+  S=call('saveUser',{name:'農家B（お試し）',role:'farmer',pin:'3333',loader:'farmer'});
+  const U=nm=>S.users.find(u=>u.name===nm).id, it=nm=>S.items.find(i=>i.name===nm).id;
+  const K={uid:U('カワヨ担当（お試し）'),pin:'1111'}, A={uid:U('農家A（お試し）'),pin:'2222'}, B={uid:U('農家B（お試し）'),pin:'3333'};
+  call('saveStock',{itemId:it('スーダンソルゴー'),rolls:6,note:'倉庫前'},A);
+  call('saveStock',{itemId:it('イタリアン'),rolls:4},A);
+  call('saveStock',{itemId:it('スーダンソルゴー'),rolls:8},B);
+  call('saveStock',{itemId:it('わら'),rolls:20},B);
+  const d=k=>{const x=new Date(Date.now()+9*3600e3+k*864e5);return x.toISOString().slice(0,10)};
+  const o=call('createOrder',{itemId:it('スーダンソルゴー'),kg:4500,dueDate:d(20),note:'お試しの発注'},K).orders[0];
+  call('allocate',{orderId:o.id,farmerId:A.uid,rolls:5,loader:'buyer'});
+  const al=call('allocate',{orderId:o.id,farmerId:B.uid,rolls:5,loader:'farmer'}).allocs.find(a=>a.farmerId===A.uid);
+  call('proposeDates',{id:al.id,candidates:[d(8),d(10)]},K);
+  call('createOrder',{itemId:it('わら'),kg:1200,dueDate:d(25)},K);
+  window.__demoUsers=[['栗原（事務局）',adm],['カワヨ担当',K],['農家A',A],['農家B',B]];
+}
+
+/* ======== 設定：GASのウェブアプリURLを貼る ======== */
+const GAS_URL = 'demo';
+/* ================================================ */
+
+let API = new URLSearchParams(location.search).get('api') || GAS_URL || (function(){try{return localStorage.getItem('kumiai_api')||''}catch(e){return ''}})();
+const LS = {
+  get(k){try{return JSON.parse(localStorage.getItem('kumiai_'+k))}catch(e){return null}},
+  set(k,v){try{localStorage.setItem('kumiai_'+k,JSON.stringify(v))}catch(e){}},
+  del(k){try{localStorage.removeItem('kumiai_'+k)}catch(e){}}
+};
+let auth = LS.get('auth');
+let S = null;           // サーバーから来た状態
+let tab = null;
+let ui = { orderFilter:'open', month: ym(new Date()) };
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function ym(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+function md(s){if(!s||!/^\d{4}-\d{2}-\d{2}/.test(s))return '未定';const d=new Date(s.slice(0,10)+'T00:00:00');return (d.getMonth()+1)+'/'+d.getDate()+'（'+'日月火水木金土'[d.getDay()]+'）'}
+const fmt = n => n==null||n==='' ? '—' : Number(n).toLocaleString('ja-JP');
+const yen = n => n==null ? '—' : '¥'+Math.round(n).toLocaleString('ja-JP');
+const today = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+
+function toast(msg, err){const t=$('#toast');t.textContent=msg;t.className=err?'err':'';t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,err?4000:2200)}
+function openModal(html){$('#sheet').innerHTML=html;$('#modal').hidden=false}
+function closeModal(){$('#modal').hidden=true;$('#sheet').innerHTML=''}
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
+function confirmBox(msg, okLabel, fn, danger){
+  openModal(`<h3>確認</h3><p>${esc(msg)}</p><div class="row"><button class="btn sub grow" onclick="closeModal()">やめる</button><button class="btn ${danger?'danger':''} grow" id="cfOk">${esc(okLabel)}</button></div>`);
+  $('#cfOk').onclick=()=>{closeModal();fn()};
+}
+
+async function api(action, payload={}){
+  if(!API){toast('GASのURLが設定されていません',true);throw new Error('no api')}
+  $('#busy').hidden=false;
+  try{
+    const body = action==='names' ? {action} : Object.assign({}, payload, {action, auth});
+    await new Promise(r=>setTimeout(r,120));
+    const j = window.__demoPost(JSON.parse(JSON.stringify(body)));
+    if(!j.ok) throw new Error(j.error||'エラー');
+    return j.data;
+  }finally{$('#busy').hidden=true}
+}
+async function act(action, payload, okMsg){
+  try{ S = await api(action, payload); if(okMsg) toast(okMsg); render(); return true; }
+  catch(e){ if(e.message!=='no api') toast(e.message,true); if(/暗証番号が違います/.test(e.message)) logout(); return false; }
+}
+
+/* ---------- 参照 ---------- */
+const item = id => (S.items||[]).find(i=>i.id===id) || {name:'（不明）',kgPerRoll:null};
+const user = id => (S.users||[]).find(u=>u.id===id) || {name:'（不明）'};
+const buyerShort = () => (S.settings.buyerName||'引き取り側').replace(/株式会社|（株）|\(株\)/g,'').trim();
+const loaderText = v => v==='buyer' ? buyerShort()+'がフォークリフトで積む' : '農家が積む';
+const needRolls = o => { const k=item(o.itemId).kgPerRoll; return k ? o.kg/k : null; };
+const allocsOf = o => (S.allocs||[]).filter(a=>a.orderId===o.id);
+const allocRolls = o => allocsOf(o).reduce((s,a)=>s+a.rolls,0);
+const stTag = s => ({'振り分け済':'<span class="tag warn">候補日待ち</span>','候補日提示':'<span class="tag info">日程調整中</span>','日程確定':'<span class="tag">日程確定</span>','納品済':'<span class="tag ok">納品済</span>'}[s]||esc(s));
+function orderState(o){
+  if(o.cancelled) return 'cancel';
+  const al=allocsOf(o), need=Math.ceil(needRolls(o)||0);
+  if(al.length && al.every(a=>a.status==='納品済') && allocRolls(o)>=need) return 'done';
+  return 'open';
+}
+function loaderSeg(id, cur, fnName){
+  return `<div class="seg" role="group" aria-label="積み込み担当">
+    <button class="${cur!=='buyer'?'on':''}" onclick="${fnName}('${id}','farmer')">農家が積む</button>
+    <button class="${cur==='buyer'?'on':''}" onclick="${fnName}('${id}','buyer')">${esc(buyerShort())}がフォークで積む</button></div>`;
+}
+
+/* ---------- ログイン ---------- */
+async function showLogin(){
+  $('#app').innerHTML = `<div class="login"><div class="card">
+    <h2>自給飼料 発注管理</h2><p class="muted">名前を選んで、暗証番号（4桁）を入れてください</p>
+    <label for="lgName">名前</label><select id="lgName"><option>読み込み中…</option></select>
+    <label for="lgPin">暗証番号</label><input id="lgPin" inputmode="numeric" pattern="\\d*" maxlength="4" autocomplete="off" placeholder="4桁">
+    <div style="margin-top:14px"><button class="btn block" id="lgBtn">ログイン</button></div>
+    <div id="lgErr" hidden style="margin-top:14px;background:var(--bad-soft);color:var(--bad);border-radius:10px;padding:10px 12px;font-size:14px"></div>
+    <div id="lgUrl" hidden><label for="lgApi">GASのウェブアプリURL（…/exec で終わるもの）</label><input id="lgApi" placeholder="https://script.google.com/macros/s/…/exec">
+      <div style="margin-top:8px"><button class="btn sub block" id="lgApiOk">このURLで接続</button></div></div>
+  </div></div>`;
+  $('#lgApiOk').onclick=()=>{const u=$('#lgApi').value.trim(); if(!/^https:\/\/script\.google\.com\/.+\/exec/.test(u)){toast('…/exec で終わるURLを貼ってください',true);return}
+    API=u; try{localStorage.setItem('kumiai_api',u)}catch(e){} showLogin();};
+  $('#lgBtn').onclick = login;
+  $('#lgPin').onkeydown = e => { if(e.key==='Enter') login(); };
+  try{
+    const names = await api('names');
+    const g = {admin:'事務局',buyer:'引き取り側',farmer:'農家'};
+    $('#lgName').innerHTML = '<option value="">選んでください</option>' + ['admin','buyer','farmer'].map(r=>{
+      const xs=names.filter(n=>n.role===r); if(!xs.length) return '';
+      return `<optgroup label="${g[r]}">${xs.map(n=>`<option value="${n.id}">${esc(n.name)}</option>`).join('')}</optgroup>`;
+    }).join('');
+    const last = LS.get('lastUid'); if(last) $('#lgName').value = last;
+    if(!names.length) throw new Error('メンバーが0人です');
+  }catch(e){
+    $('#lgName').innerHTML='<option value="">読み込めません</option>';
+    let m;
+    if(e.message==='no api') m='GASのURLが入っていません。下にURLを貼るか、index.html の GAS_URL に貼ってアップロードし直してください。';
+    else if(/Failed to fetch|NetworkError|Load failed|JSON|Unexpected token/i.test(e.message)) m='GASにつながりません。GASのデプロイで「アクセスできるユーザー：全員」になっているか、URLが「…/exec」で終わっているかを確認してください。（詳細：'+e.message+'）';
+    else m='読み込みエラー：'+e.message;
+    $('#lgErr').textContent=m; $('#lgErr').hidden=false; $('#lgUrl').hidden=false; if(API) $('#lgApi').value=API;
+  }
+}
+async function login(){
+  const uid=$('#lgName').value, pin=$('#lgPin').value.trim();
+  if(!uid){toast('名前を選んでください',true);return}
+  if(!/^\d{4}$/.test(pin)){toast('暗証番号は4桁です',true);return}
+  auth={uid,pin};
+  try{ S = await api('state'); LS.set('auth',auth); LS.set('lastUid',uid); tab=null; render(); }
+  catch(e){ auth=null; toast(e.message,true); }
+}
+function logout(){ auth=null; S=null; LS.del('auth'); showLogin(); }
+
+/* ---------- 画面の骨組み ---------- */
+const TABS = {
+  admin:[['orders','発注・振り分け'],['stock','農家の在庫'],['settle','納品・精算'],['setup','設定']],
+  buyer:[['new','発注する'],['orders','発注一覧'],['pickup','引き取り予定']],
+  farmer:[['mine','引き取り予定'],['stock','出せるロール']]
+};
+function render(){
+  if(!S){showLogin();return}
+  const role=S.me.role, tabs=TABS[role];
+  if(!tab || !tabs.some(t=>t[0]===tab)) tab=tabs[0][0];
+  const roleName={admin:'事務局',buyer:'引き取り側',farmer:'農家'}[role];
+  $('#app').innerHTML = `<header><h1>${esc(S.settings.kumiaiName||'自給飼料生産組合')}<small>${esc(S.me.name)}さん（${roleName}）</small></h1>
+    <button onclick="reload()" aria-label="最新にする">更新</button><button onclick="confirmBox('ログアウトしますか？','ログアウト',logout)">ログアウト</button></header>
+    <nav>${tabs.map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="go('${k}')">${l}</button>`).join('')}</nav>
+    <main id="main"></main>`;
+  const V = VIEWS[role+':'+tab]; $('#main').innerHTML = V();
+  if(VIEWS[role+':'+tab+':after']) VIEWS[role+':'+tab+':after']();
+}
+function go(k){tab=k;render();window.scrollTo(0,0)}
+async function reload(){ await act('state',{}, '最新にしました'); }
+
+/* ---------- 共通：発注カード ---------- */
+function orderCard(o, mode){
+  const it=item(o.itemId), need=needRolls(o), got=allocRolls(o), al=allocsOf(o);
+  const needR = need==null ? '—' : (Math.round(need*10)/10);
+  const pct = need ? Math.min(100, got/Math.ceil(need)*100) : 0;
+  const st = orderState(o);
+  const head = `<div class="row"><h3 class="grow">${esc(it.name)} ${fmt(o.kg)}kg</h3>
+    ${st==='cancel'?'<span class="tag bad">取り消し</span>':st==='done'?'<span class="tag ok">完了</span>':''}</div>
+    <div class="muted">約${needR}ロール（1ロール${fmt(it.kgPerRoll)}kg換算）・納期 ${md(o.dueDate)}・受付 ${esc((o.createdAt||'').slice(5,16).replace('-','/'))}</div>
+    ${o.note?`<div class="muted">メモ：${esc(o.note)}</div>`:''}
+    ${st!=='cancel'?`<div class="bar"><i style="width:${pct}%"></i></div><div class="muted">振り分け ${got} / ${need==null?'—':Math.ceil(need)}ロール</div>`:''}`;
+  const rows = al.map(a=>allocRow(a, mode)).join('');
+  let foot='';
+  if(st!=='cancel' && mode==='admin'){
+    foot = `<div class="row" style="margin-top:10px"><button class="btn sm" onclick="allocModal('${o.id}')">＋ 農家に振り分け</button>
+      ${al.some(a=>a.status==='納品済')?'':`<button class="btn sm danger" onclick="cancelOrder('${o.id}')">発注を取り消す</button>`}</div>`;
+  }
+  if(st!=='cancel' && mode==='buyer' && !al.some(a=>a.status==='納品済')){
+    foot = `<div class="row" style="margin-top:10px"><button class="btn sm danger" onclick="cancelOrder('${o.id}')">発注を取り消す</button></div>`;
+  }
+  return `<div class="card">${head}${rows}${foot}</div>`;
+}
+function allocRow(a, mode){
+  const f=user(a.farmerId);
+  let body = `<div class="row"><b class="grow">${esc(f.name)}さん　${a.rolls}ロール</b>${stTag(a.status)}</div>
+    <div class="muted">積み込み：${esc(loaderText(a.loader))}</div>`;
+  if(a.status==='候補日提示') body += `<div class="muted">候補日：${a.candidates.map(md).join('・')}（農家の返事待ち）</div>`;
+  if(a.date) body += `<div>引き取り・納品日：<b>${md(a.date)}</b></div>`;
+  if(a.status==='納品済') body += `<div>納品量：<b>${fmt(a.deliveredKg)}kg</b></div>`;
+  if(a.status!=='納品済'){
+    const btns=[];
+    if(mode==='buyer'||mode==='admin') btns.push(`<button class="btn sm sub" onclick="dateModal('${a.id}')">${a.candidates.length?'候補日を出し直す':'候補日を入れる'}</button>`);
+    if(mode==='admin' && a.candidates.length) btns.push(`<button class="btn sm sub" onclick="adminPickModal('${a.id}')">日付を確定</button>`);
+    btns.push(`<button class="btn sm sub" onclick="loaderModal('${a.id}')">積み込み担当</button>`);
+    if((mode==='buyer' && a.status==='日程確定') || mode==='admin') btns.push(`<button class="btn sm" onclick="deliverModal('${a.id}')">納品kgを入力</button>`);
+    if(mode==='admin') btns.push(`<button class="btn sm danger" onclick="delAlloc('${a.id}')">振り分けを取り消す</button>`);
+    body += `<div class="row" style="margin-top:8px">${btns.join('')}</div>`;
+  }
+  return `<div class="alloc">${body}</div>`;
+}
+function orderFilterBar(){
+  const n = k => (S.orders||[]).filter(o=>orderState(o)===k).length;
+  return `<div class="filter">${[['open','進行中'],['done','完了'],['cancel','取り消し']].map(([k,l])=>`<button class="${ui.orderFilter===k?'on':''}" onclick="ui.orderFilter='${k}';render()">${l}（${n(k)}）</button>`).join('')}</div>`;
+}
+function ordersSorted(){
+  return (S.orders||[]).filter(o=>orderState(o)===ui.orderFilter).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+}
+
+/* ---------- モーダル：操作 ---------- */
+function allocModal(orderId){
+  const o=S.orders.find(x=>x.id===orderId), it=item(o.itemId);
+  const need=Math.ceil(needRolls(o)||0), rest=Math.max(0, need-allocRolls(o));
+  const farmers=(S.users||[]).filter(u=>u.role==='farmer');
+  const opts=farmers.map(f=>{const s=(S.stocks||[]).find(x=>x.farmerId===f.id&&x.itemId===o.itemId);return {f,have:s?s.rolls:0}})
+    .sort((a,b)=>b.have-a.have);
+  if(!farmers.length){toast('先に「設定」で農家を登録してください',true);return}
+  openModal(`<h3>農家に振り分け</h3><div class="muted">${esc(it.name)} ${fmt(o.kg)}kg／残り約${rest}ロール</div>
+    <label for="alF">農家（カッコ内は出せるロール数）</label>
+    <select id="alF">${opts.map(x=>`<option value="${x.f.id}" data-loader="${x.f.loader||'farmer'}" ${x.have?'':'disabled'}>${esc(x.f.name)}（${x.have}ロール）</option>`).join('')}</select>
+    <label for="alR">ロール数</label><input id="alR" type="number" inputmode="numeric" min="1" value="${rest||''}">
+    <label>積み込み</label><div id="alL"></div>
+    <div class="row" style="margin-top:14px"><button class="btn sub grow" onclick="closeModal()">やめる</button><button class="btn grow" id="alOk">振り分ける</button></div>`);
+  let loader='farmer';
+  const drawL=()=>{$('#alL').innerHTML=`<div class="seg"><button class="${loader!=='buyer'?'on':''}" data-v="farmer">農家が積む</button><button class="${loader==='buyer'?'on':''}" data-v="buyer">${esc(buyerShort())}がフォークで積む</button></div>`;
+    $('#alL').querySelectorAll('button').forEach(b=>b.onclick=()=>{loader=b.dataset.v;drawL()})};
+  const syncF=()=>{const op=$('#alF').selectedOptions[0]; loader=op?op.dataset.loader:'farmer'; drawL();};
+  const firstOk=[...$('#alF').options].find(op=>!op.disabled); if(firstOk) $('#alF').value=firstOk.value;
+  $('#alF').onchange=syncF; syncF();
+  $('#alOk').onclick=async()=>{ if(await act('allocate',{orderId,farmerId:$('#alF').value,rolls:Number($('#alR').value),loader},'振り分けました')) closeModal(); };
+}
+function dateModal(allocId){
+  const a=S.allocs.find(x=>x.id===allocId);
+  const c=a.candidates.length?a.candidates:[];
+  openModal(`<h3>引き取り候補日</h3><div class="muted">${esc(user(a.farmerId).name)}さん ${a.rolls}ロール。都合のいい日を最大3つ入れてください。農家さんが1つ選ぶと確定します。</div>
+    ${[0,1,2].map(i=>`<label for="cd${i}">候補${i+1}${i?'（任意）':''}</label><input id="cd${i}" type="date" min="${today()}" value="${c[i]||''}">`).join('')}
+    <div class="row" style="margin-top:14px"><button class="btn sub grow" onclick="closeModal()">やめる</button><button class="btn grow" id="cdOk">農家さんに送る</button></div>`);
+  $('#cdOk').onclick=async()=>{const cs=[0,1,2].map(i=>$('#cd'+i).value).filter(Boolean); if(!cs.length){toast('候補日を1つ以上入れてください',true);return}
+    if(await act('proposeDates',{id:allocId,candidates:cs},'候補日を送りました')) closeModal();};
+}
+function adminPickModal(allocId){
+  const a=S.allocs.find(x=>x.id===allocId);
+  openModal(`<h3>日付を確定（事務局）</h3><div class="muted">農家さんの代わりに確定します</div>
+    <div class="datechips">${a.candidates.map(d=>`<button onclick="pick('${allocId}','${d}')">${md(d)}</button>`).join('')}</div>
+    <label for="apD">別の日にする</label><input id="apD" type="date">
+    <div class="row" style="margin-top:14px"><button class="btn sub grow" onclick="closeModal()">やめる</button><button class="btn grow" onclick="$('#apD').value?pick('${allocId}',$('#apD').value):toast('日付を選んでください',true)">この日で確定</button></div>`);
+}
+async function pick(id,date){ if(await act('pickDate',{id,date},md(date)+'で確定しました')) closeModal(); }
+function loaderModal(allocId){
+  const a=S.allocs.find(x=>x.id===allocId);
+  openModal(`<h3>積み込み担当</h3><div class="muted">${esc(user(a.farmerId).name)}さん ${a.rolls}ロール</div><div style="margin-top:10px">${loaderSeg(allocId,a.loader,'setLoader')}</div>
+    <div style="margin-top:14px"><button class="btn sub block" onclick="closeModal()">閉じる</button></div>`);
+}
+async function setLoader(id,v){ if(await act('setLoader',{id,loader:v},'積み込み担当を変更しました')) closeModal(); }
+function deliverModal(allocId){
+  const a=S.allocs.find(x=>x.id===allocId), o=S.orders.find(x=>x.id===a.orderId), it=item(o.itemId);
+  openModal(`<h3>納品kgを入力</h3><div class="muted">${esc(user(a.farmerId).name)}さん：${esc(it.name)} ${a.rolls}ロール（目安 ${fmt(a.rolls*(it.kgPerRoll||0))}kg）</div>
+    <label for="dvK">実際の納品量（kg）</label><input id="dvK" type="number" inputmode="decimal" min="0" step="0.1" value="${a.deliveredKg??''}">
+    <div class="row" style="margin-top:14px"><button class="btn sub grow" onclick="closeModal()">やめる</button><button class="btn grow" id="dvOk">納品済みにする</button></div>`);
+  $('#dvOk').onclick=async()=>{const kg=Number($('#dvK').value); if(!(kg>0)){toast('kgを入れてください',true);return}
+    if(await act('deliver',{id:allocId,kg},'納品を記録しました')) closeModal();};
+}
+function cancelOrder(id){ confirmBox('この発注を取り消しますか？振り分けたロールは農家の在庫に戻ります。','取り消す',()=>act('cancelOrder',{id},'取り消しました'),true); }
+function delAlloc(id){ confirmBox('この振り分けを取り消しますか？ロールは農家の在庫に戻ります。','取り消す',()=>act('deleteAlloc',{id},'取り消しました'),true); }
+
+/* ---------- 在庫（出せるロール） ---------- */
+function stockModal(farmerId, itemId){
+  const s=(S.stocks||[]).find(x=>x.farmerId===farmerId&&x.itemId===itemId);
+  const items=S.items.filter(i=>i.active);
+  openModal(`<h3>出せるロール数</h3>${S.me.role==='admin'?`<div class="muted">${esc(user(farmerId).name)}さん</div>`:''}
+    <label for="skI">品目</label><select id="skI">${items.map(i=>`<option value="${i.id}" ${i.id===itemId?'selected':''}>${esc(i.name)}（1ロール約${fmt(i.kgPerRoll)}kg）</option>`).join('')}</select>
+    <label for="skR">いま出せるロール数</label><input id="skR" type="number" inputmode="numeric" min="0" value="${s?s.rolls:''}">
+    <label for="skN">メモ（保管場所・引き取りの注意など）</label><input id="skN" value="${esc(s?s.note:'')}">
+    <div class="row" style="margin-top:14px"><button class="btn sub grow" onclick="closeModal()">やめる</button><button class="btn grow" id="skOk">保存</button></div>`);
+  const fill=()=>{const x=(S.stocks||[]).find(y=>y.farmerId===farmerId&&y.itemId===$('#skI').value);$('#skR').value=x?x.rolls:'';$('#skN').value=x?x.note:''};
+  if(!itemId) fill();
+  $('#skI').onchange=fill;
+  $('#skOk').onclick=async()=>{const r=$('#skR').value; if(r===''){toast('ロール数を入れてください',true);return}
+    if(await act('saveStock',{farmerId,itemId:$('#skI').value,rolls:Number(r),note:$('#skN').value},'保存しました')) closeModal();};
+}
+
+/* ---------- 画面 ---------- */
+const VIEWS = {
+  /* ===== 事務局 ===== */
+  'admin:orders'(){
+    const os=ordersSorted();
+    const waiting=(S.orders||[]).filter(o=>orderState(o)==='open' && allocRolls(o)<Math.ceil(needRolls(o)||0)).length;
+    return `${waiting?`<div class="card" style="background:var(--warn-soft);border-color:transparent;color:var(--warn)"><b>振り分けが足りない発注が${waiting}件あります</b></div>`:''}
+      <div class="row" style="margin-bottom:10px"><button class="btn sm sub" onclick="adminNewOrder()">＋ 代理で発注を入れる</button></div>
+      ${orderFilterBar()}${os.length?os.map(o=>orderCard(o,'admin')).join(''):'<div class="empty">該当する発注はありません</div>'}`;
+  },
+  'admin:stock'(){
+    const farmers=(S.users||[]).filter(u=>u.role==='farmer'), items=S.items.filter(i=>i.active);
+    if(!farmers.length) return '<div class="empty">農家が登録されていません。「設定」で追加してください</div>';
+    const tot=items.map(i=>({i,r:(S.stocks||[]).filter(s=>s.itemId===i.id).reduce((a,s)=>a+s.rolls,0)}));
+    return `<div class="sum">${tot.map(t=>`<div class="card"><div class="muted">${esc(t.i.name)}</div><div class="big">${t.r}<small style="font-size:13px">ロール</small></div><div class="muted">約${fmt(t.r*t.i.kgPerRoll)}kg</div></div>`).join('')}</div>
+      <p class="muted">農家同士はお互いの数字を見られません（事務局だけに表示）</p>
+      ${farmers.map(f=>{const ss=(S.stocks||[]).filter(s=>s.farmerId===f.id);
+        return `<div class="card"><div class="row"><h3 class="grow">${esc(f.name)}さん</h3><span class="tag ${f.loader==='buyer'?'info':''}">${f.loader==='buyer'?'フォーク積み':'農家積み'}</span></div>
+        ${ss.length?`<table><tbody>${ss.map(s=>`<tr><td>${esc(item(s.itemId).name)}</td><td class="n"><b>${s.rolls}</b>ロール</td><td class="muted">${esc(s.note||'')}</td><td class="n"><button class="btn sm sub" onclick="stockModal('${f.id}','${s.itemId}')">変更</button></td></tr>`).join('')}</tbody></table>`:'<div class="muted">まだ登録がありません</div>'}
+        <div style="margin-top:8px"><button class="btn sm sub" onclick="stockModal('${f.id}','')">＋ 品目を追加</button></div></div>`}).join('')}`;
+  },
+  'admin:settle'(){
+    const done=(S.allocs||[]).filter(a=>a.status==='納品済' && (a.date||'').slice(0,7)===ui.month);
+    const fee=S.settings.feePerKg;
+    const months=[...new Set((S.allocs||[]).filter(a=>a.status==='納品済').map(a=>(a.date||'').slice(0,7)).concat([ym(new Date())]))].sort().reverse();
+    if(!ui.monthTouched && !done.length && months[0]!==ui.month){ ui.month=months[0]; return VIEWS['admin:settle'](); }
+    const byF={};
+    done.forEach(a=>{const o=S.orders.find(x=>x.id===a.orderId), it=item(o.itemId);
+      const k=a.farmerId; byF[k]=byF[k]||{kg:0,amt:0,priced:true,rolls:0,lines:[]};
+      const amt = it.unitPrice==null?null:a.deliveredKg*it.unitPrice;
+      byF[k].kg+=a.deliveredKg; byF[k].rolls+=a.rolls; if(amt==null) byF[k].priced=false; else byF[k].amt+=amt;
+      byF[k].lines.push({a,it,amt});});
+    const totKg=done.reduce((s,a)=>s+a.deliveredKg,0);
+    const allPriced=Object.values(byF).every(x=>x.priced);
+    const totAmt=Object.values(byF).reduce((s,x)=>s+x.amt,0);
+    return `<div class="row" style="margin-bottom:10px"><label for="mSel" style="margin:0">対象月</label><select id="mSel" style="width:auto" onchange="ui.month=this.value;ui.monthTouched=true;render()">${months.map(m=>`<option value="${m}" ${m===ui.month?'selected':''}>${m.replace('-','年')}月</option>`).join('')}</select>
+      <button class="btn sm sub" onclick="csvSettle()">CSVで保存</button></div>
+      <div class="sum">
+        <div class="card"><div class="muted">納品量</div><div class="big">${fmt(totKg)}<small style="font-size:13px">kg</small></div></div>
+        <div class="card"><div class="muted">金額（kg単価×納品kg）</div><div class="big">${done.length&&allPriced?yen(totAmt):'—'}</div>${done.length&&!allPriced?'<div class="muted">単価未設定の品目あり</div>':''}</div>
+        <div class="card"><div class="muted">組合手数料${fee!=null?`（${fee}円/kg）`:''}</div><div class="big">${fee!=null&&done.length?yen(totKg*fee):'—'}</div>${fee==null?'<div class="muted">「設定」で入力</div>':''}</div>
+      </div>
+      ${done.length?Object.entries(byF).map(([fid,x])=>`<div class="card"><div class="row"><h3 class="grow">${esc(user(fid).name)}さん</h3><b>${fmt(x.kg)}kg</b></div>
+        <div class="tblwrap"><table><thead><tr><th>日付</th><th>品目</th><th class="n">ロール</th><th class="n">納品kg</th><th class="n">金額</th></tr></thead><tbody>
+        ${x.lines.sort((p,q)=>p.a.date.localeCompare(q.a.date)).map(l=>`<tr><td>${md(l.a.date)}</td><td>${esc(l.it.name)}</td><td class="n">${l.a.rolls}</td><td class="n">${fmt(l.a.deliveredKg)}</td><td class="n">${yen(l.amt)}</td></tr>`).join('')}
+        </tbody></table></div>
+        <div class="muted" style="margin-top:6px">金額 ${x.priced?yen(x.amt):'単価未設定'}${fee!=null?`／手数料 ${yen(x.kg*fee)}／差引 ${x.priced?yen(x.amt-x.kg*fee):'—'}`:''}</div></div>`).join('')
+        :'<div class="empty">この月の納品はまだありません</div>'}
+      <p class="muted">※ 納品kgは${esc(buyerShort())}さんから返ってくる実際の数字です。お金の流れ（${esc(buyerShort())}→組合→農家）の精算に使ってください。</p>`;
+  },
+  'admin:setup'(){
+    const us=S.users||[], g={admin:'事務局',buyer:'引き取り側',farmer:'農家'};
+    return `<div class="card"><h3>組合の情報</h3>
+      <label for="stK">組合名</label><input id="stK" value="${esc(S.settings.kumiaiName||'')}">
+      <label for="stB">引き取り側（発注元）</label><input id="stB" value="${esc(S.settings.buyerName||'')}">
+      <label for="stF">組合手数料（円/kg・未定なら空欄）</label><input id="stF" type="number" inputmode="decimal" step="0.1" min="0" value="${S.settings.feePerKg??''}">
+      <div style="margin-top:10px"><button class="btn" onclick="saveSettings()">保存</button></div></div>
+    <div class="card"><div class="row"><h3 class="grow">品目と1ロールの重さ</h3><button class="btn sm sub" onclick="itemModal('')">＋ 追加</button></div>
+      <table><thead><tr><th>品目</th><th class="n">1ロール</th><th class="n">kg単価</th><th></th></tr></thead><tbody>
+      ${S.items.map(i=>`<tr${i.active?'':' style="opacity:.5"'}><td>${esc(i.name)}${i.active?'':'（停止）'}</td><td class="n">${fmt(i.kgPerRoll)}kg</td><td class="n">${i.unitPrice==null?'<span class="muted">未定</span>':i.unitPrice+'円'}</td><td class="n"><button class="btn sm sub" onclick="itemModal('${i.id}')">変更</button></td></tr>`).join('')}
+      </tbody></table></div>
+    <div class="card"><div class="row"><h3 class="grow">メンバーと暗証番号</h3><button class="btn sm sub" onclick="userModal('')">＋ 追加</button></div>
+      <p class="muted">暗証番号は本人にだけ伝えてください。LINE通知は、公式アカウントを友だち追加して「名前 暗証番号」を送ると届くようになります。</p>
+      <table><thead><tr><th>名前</th><th>役割</th><th>番号</th><th>LINE</th><th></th></tr></thead><tbody>
+      ${us.map(u=>`<tr><td>${esc(u.name)}${u.role==='farmer'?`<div class="muted">${u.loader==='buyer'?'フォーク積み':'農家積み'}</div>`:''}</td><td>${g[u.role]}</td><td>${esc(u.pin)}</td><td>${u.linked?'<span class="tag ok">連携済</span>':'<span class="tag warn">未</span>'}</td><td class="n"><button class="btn sm sub" onclick="userModal('${u.id}')">変更</button></td></tr>`).join('')}
+      </tbody></table></div>`;
+  },
+  /* ===== 引き取り側（カワヨ） ===== */
+  'buyer:new'(){
+    const items=S.items.filter(i=>i.active);
+    return `<div class="card"><h3>発注する</h3>
+      <label for="noI">品目</label><select id="noI">${items.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select>
+      <label for="noK">数量（kg）</label><input id="noK" type="number" inputmode="decimal" min="0" placeholder="例：4500">
+      <div class="conv" id="noConv" aria-live="polite">kgを入れるとロール数の目安が出ます</div>
+      <label for="noD">希望納期</label><input id="noD" type="date" min="${today()}">
+      <label for="noN">メモ（任意）</label><input id="noN" placeholder="例：水分少なめ希望">
+      <div style="margin-top:14px"><button class="btn block" id="noOk">発注する</button></div></div>
+      <p class="muted">発注すると事務局に届き、農家への振り分けが決まったら通知します。</p>`;
+  },
+  'buyer:new:after'(){ newOrderWire(); },
+  'buyer:orders'(){ const os=ordersSorted(); return orderFilterBar()+(os.length?os.map(o=>orderCard(o,'buyer')).join(''):'<div class="empty">該当する発注はありません</div>'); },
+  'buyer:pickup'(){
+    const al=(S.allocs||[]).filter(a=>a.status!=='納品済');
+    const todo=al.filter(a=>a.status==='振り分け済'), wait=al.filter(a=>a.status==='候補日提示'), fixed=al.filter(a=>a.status==='日程確定').sort((a,b)=>a.date.localeCompare(b.date));
+    const card=a=>{const o=S.orders.find(x=>x.id===a.orderId);return `<div class="card"><div class="muted">${esc(item(o.itemId).name)}・納期 ${md(o.dueDate)}</div>${allocRow(a,'buyer').replace('class="alloc"','')}</div>`};
+    return (todo.length?`<h3>候補日を入れてください（${todo.length}）</h3>${todo.map(card).join('')}`:'')
+      +(fixed.length?`<h3>確定した引き取り</h3>${fixed.map(card).join('')}`:'')
+      +(wait.length?`<h3>農家の返事待ち</h3>${wait.map(card).join('')}`:'')
+      +(!al.length?'<div class="empty">予定はありません</div>':'');
+  },
+  /* ===== 農家 ===== */
+  'farmer:mine'(){
+    const al=(S.allocs||[]).slice().sort((a,b)=>(a.status==='納品済')-(b.status==='納品済')||(a.date||'9').localeCompare(b.date||'9'));
+    if(!al.length) return `<div class="empty">いまお願いしている引き取りはありません<br><br><button class="btn sub" onclick="go('stock')">出せるロール数を登録する</button></div>`;
+    const done=al.filter(a=>a.status==='納品済'), act_=al.filter(a=>a.status!=='納品済');
+    const card=a=>{const o=S.orders.find(x=>x.id===a.orderId)||{}, it=item(o.itemId);
+      let h=`<div class="card"><div class="row"><h3 class="grow">${esc(it.name)} ${a.rolls}ロール</h3>${stTag(a.status)}</div>`;
+      if(a.status==='振り分け済') h+=`<div class="muted">${esc(buyerShort())}さんから候補日が届くのを待っています</div>`;
+      if(a.status==='候補日提示') h+=`<div><b>都合のいい日をタップしてください</b></div><div class="datechips">${a.candidates.map(d=>`<button onclick="confirmBox('${md(d)}で確定しますか？','確定する',()=>pickF('${a.id}','${d}'))">${md(d)}</button>`).join('')}</div>
+        <div class="muted" style="margin-top:6px">どの日も無理なときは事務局に連絡してください</div>`;
+      if(a.date) h+=`<div class="big" style="margin:4px 0">${md(a.date)}</div><div class="muted">この日に${esc(buyerShort())}さんが引き取りに来ます</div>`;
+      if(a.status==='納品済') h+=`<div>納品量：<b>${fmt(a.deliveredKg)}kg</b></div>`;
+      if(a.status!=='納品済') h+=`<label>積み込み</label>${loaderSeg(a.id,a.loader,'setLoaderF')}`;
+      return h+'</div>';};
+    return act_.map(card).join('')+(done.length?`<h3 style="margin-top:20px">納品済み</h3>${done.map(card).join('')}`:'');
+  },
+  'farmer:stock'(){
+    const ss=S.stocks||[];
+    return `<p class="muted">いま出せるロール数を登録しておくと、事務局が振り分けに使います。ほかの農家さんには見えません。</p>
+      ${ss.length?ss.map(s=>{const it=item(s.itemId);return `<div class="card"><div class="row"><div class="grow"><h3>${esc(it.name)}</h3><div class="muted">約${fmt(s.rolls*(it.kgPerRoll||0))}kg${s.note?'・'+esc(s.note):''}</div></div><div class="big">${s.rolls}<small style="font-size:13px">ロール</small></div></div>
+        <div style="margin-top:8px"><button class="btn sm sub" onclick="stockModal('${S.me.id}','${s.itemId}')">数を変更</button></div></div>`}).join(''):'<div class="empty">まだ登録がありません</div>'}
+      <button class="btn block" onclick="stockModal('${S.me.id}','')">＋ 登録する</button>`;
+  }
+};
+async function pickF(id,d){ await act('pickDate',{id,date:d},md(d)+'で確定しました'); }
+async function setLoaderF(id,v){ await act('setLoader',{id,loader:v},'積み込み担当を変更しました'); }
+
+function newOrderWire(){
+  const upd=()=>{const it=item($('#noI').value), kg=Number($('#noK').value);
+    $('#noConv').textContent = kg>0 && it.kgPerRoll ? `${fmt(kg)}kg ÷ ${fmt(it.kgPerRoll)}kg ＝ 約${Math.round(kg/it.kgPerRoll*10)/10}ロール（${Math.ceil(kg/it.kgPerRoll)}ロール分を振り分け）` : 'kgを入れるとロール数の目安が出ます';};
+  $('#noI').onchange=upd; $('#noK').oninput=upd;
+  $('#noOk').onclick=()=>{const kg=Number($('#noK').value); if(!(kg>0)){toast('kgを入れてください',true);return}
+    const it=item($('#noI').value);
+    confirmBox(`${it.name} ${fmt(kg)}kg（約${Math.round(kg/it.kgPerRoll*10)/10}ロール）を発注します`,'発注する',async()=>{
+      if(await act('createOrder',{itemId:$('#noI').value,kg,dueDate:$('#noD').value,note:$('#noN').value},'発注しました')){ if(S.me.role==='buyer'){ui.orderFilter='open';go('orders');} }
+    });};
+}
+function adminNewOrder(){
+  const items=S.items.filter(i=>i.active);
+  openModal(`<h3>代理で発注を入れる</h3><div class="muted">電話やLINEで受けた発注を事務局が入力します</div>
+    <label for="noI">品目</label><select id="noI">${items.map(i=>`<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select>
+    <label for="noK">数量（kg）</label><input id="noK" type="number" inputmode="decimal" min="0">
+    <div class="conv" id="noConv">kgを入れるとロール数の目安が出ます</div>
+    <label for="noD">希望納期</label><input id="noD" type="date">
+    <label for="noN">メモ</label><input id="noN">
+    <div class="row" style="margin-top:14px"><button class="btn sub grow" onclick="closeModal()">やめる</button><button class="btn grow" id="noOk">発注を登録</button></div>`);
+  newOrderWire();
+  const orig=$('#noOk').onclick; $('#noOk').onclick=()=>{ const kg=Number($('#noK').value); if(!(kg>0)){toast('kgを入れてください',true);return}
+    act('createOrder',{itemId:$('#noI').value,kg,dueDate:$('#noD').value,note:$('#noN').value},'登録しました').then(ok=>{if(ok)closeModal()}); };
+}
+
+/* ---------- 設定 ---------- */
+function saveSettings(){ act('saveSettings',{kumiaiName:$('#stK').value,buyerName:$('#stB').value,feePerKg:$('#stF').value},'保存しました'); }
+function itemModal(id){
+  const i=id?S.items.find(x=>x.id===id):{name:'',kgPerRoll:'',unitPrice:null,active:true};
+  openModal(`<h3>${id?'品目を変更':'品目を追加'}</h3>
+    <label for="imN">品目名</label><input id="imN" value="${esc(i.name)}">
+    <label for="imK">1ロールの重さ（kg）</label><input id="imK" type="number" inputmode="decimal" min="0" value="${i.kgPerRoll??''}">
+    <label for="imP">kg単価（円・未定なら空欄）</label><input id="imP" type="number" inputmode="decimal" step="0.01" min="0" value="${i.unitPrice??''}">
+    <label><input type="checkbox" id="imA" style="width:auto" ${i.active?'checked':''}> 発注で使う</label>
+    <div class="row" style="margin-top:14px"><button class="btn sub grow" onclick="closeModal()">やめる</button><button class="btn grow" id="imOk">保存</button></div>`);
+  $('#imOk').onclick=async()=>{ if(await act('saveItem',{id,name:$('#imN').value,kgPerRoll:$('#imK').value,unitPrice:$('#imP').value,active:$('#imA').checked},'保存しました')) closeModal(); };
+}
+function userModal(id){
+  const u=id?S.users.find(x=>x.id===id):{name:'',role:'farmer',pin:String(Math.floor(1000+Math.random()*9000)),loader:'farmer'};
+  openModal(`<h3>${id?'メンバーを変更':'メンバーを追加'}</h3>
+    <label for="umN">名前（ログイン画面に出ます）</label><input id="umN" value="${esc(u.name)}" placeholder="例：碓永">
+    <label for="umR">役割</label><select id="umR"><option value="farmer">農家</option><option value="buyer">引き取り側（${esc(buyerShort())}）</option><option value="admin">事務局</option></select>
+    <label for="umP">暗証番号（4桁）</label><input id="umP" inputmode="numeric" maxlength="4" value="${esc(u.pin)}">
+    <div id="umLw"><label>いつもの積み込み（振り分けの初期値）</label><select id="umL"><option value="farmer">農家が積む</option><option value="buyer">${esc(buyerShort())}がフォークで積む</option></select></div>
+    <div class="row" style="margin-top:14px">${id&&id!==S.me.id?`<button class="btn danger" id="umDel">削除</button>`:''}<button class="btn sub grow" onclick="closeModal()">やめる</button><button class="btn grow" id="umOk">保存</button></div>`);
+  $('#umR').value=u.role; $('#umL').value=u.loader||'farmer';
+  const sw=()=>$('#umLw').hidden=$('#umR').value!=='farmer'; $('#umR').onchange=sw; sw();
+  $('#umOk').onclick=async()=>{ if(await act('saveUser',{id,name:$('#umN').value,role:$('#umR').value,pin:$('#umP').value,loader:$('#umL').value},'保存しました')) closeModal(); };
+  if($('#umDel')) $('#umDel').onclick=()=>confirmBox(u.name+'さんを削除しますか？','削除する',()=>act('deleteUser',{id},'削除しました'),true);
+}
+function csvSettle(){
+  const done=(S.allocs||[]).filter(a=>a.status==='納品済' && (a.date||'').slice(0,7)===ui.month);
+  if(!done.length){toast('この月の納品はありません',true);return}
+  const fee=S.settings.feePerKg;
+  const rows=[['納品日','農家','品目','ロール','納品kg','kg単価','金額','手数料(円/kg)','手数料']];
+  done.sort((a,b)=>a.date.localeCompare(b.date)).forEach(a=>{const o=S.orders.find(x=>x.id===a.orderId), it=item(o.itemId);
+    rows.push([a.date,user(a.farmerId).name,it.name,a.rolls,a.deliveredKg,it.unitPrice??'',it.unitPrice==null?'':Math.round(a.deliveredKg*it.unitPrice),fee??'',fee==null?'':Math.round(a.deliveredKg*fee)]);});
+  const csv='﻿'+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const b=new Blob([csv],{type:'text/csv'}), l=document.createElement('a');
+  l.href=URL.createObjectURL(b); l.download=`納品明細_${ui.month}.csv`; document.body.appendChild(l); l.click(); l.remove();
+}
+
+/* ---------- お試し：立場の切り替え ---------- */
+function demoSwitch(i){var g=document.getElementById('guide');if(g&&!window.__gd){g.open=false;window.__gd=1}auth=window.__demoUsers[i][1];tab=null;ui.orderFilter='open';S=window.__demoPost({action:'state',auth}).data;render();window.scrollTo(0,0)}
+/* ---------- 起動 ---------- */
+(async()=>{
+  demoSeed(); auth=null;
+  $('#demoQs').innerHTML=window.__demoUsers.map((u,i)=>`<button onclick="demoSwitch(${i})">${u[0]}</button>`).join('');
+  if(auth){ try{ S=await api('state'); render(); return; }catch(e){ auth=null; LS.del('auth'); } }
+  showLogin();
+})();
+</script>
+
+</body>
+</html>
