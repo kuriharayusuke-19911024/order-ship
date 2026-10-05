@@ -73,6 +73,33 @@ td.n,th.n{text-align:right;white-space:nowrap}
 #modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:40;display:flex;align-items:flex-end;justify-content:center}
 #modal .sheet{background:var(--card);width:100%;max-width:560px;border-radius:16px 16px 0 0;padding:16px 16px 24px;max-height:90vh;overflow:auto}
 #modal h3{margin:0 0 8px}
+#printArea{display:none}
+.slip{background:#fff;color:#111;font-size:13px;line-height:1.5;padding:18px;border:1px solid #ccc;border-radius:6px;max-width:720px;margin:0 auto}
+.slip h2{text-align:center;font-size:20px;letter-spacing:.3em;margin:0 0 14px;border-bottom:3px double #111;padding-bottom:6px}
+.slip .top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.slip .to{font-size:16px;font-weight:700;border-bottom:1px solid #111;padding-bottom:2px;min-width:0}
+.slip .from{text-align:right;font-size:12px;min-width:0}
+.slip .from b{font-size:14px}
+.slip .meta{font-size:12px;text-align:right}
+.slip .totalbox{margin:14px 0;border:2px solid #111;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;font-size:15px;font-weight:700}
+.slip .totalbox span:last-child{font-size:20px}
+.slip table{font-size:12px;width:100%;border-collapse:collapse}
+.slip th,.slip td{border:1px solid #999;padding:4px 6px;color:#111}
+.slip th{background:#eee;font-size:11px}
+.slip td.n,.slip th.n{text-align:right;font-variant-numeric:tabular-nums}
+.slip .tot td{font-weight:700}
+.slip table{min-width:560px}
+.slip th,.slip td{white-space:nowrap}
+.slip .note{font-size:12px;margin-top:10px;white-space:pre-wrap}
+.slipwrap{overflow-x:auto}
+@media print{
+  body{background:#fff}
+  body>*:not(#printArea){display:none!important}
+  #printArea{display:block!important}
+  .slip{border:0;padding:0;max-width:none}
+  @page{size:A4;margin:14mm}
+  .slip table{min-width:0}
+}
 #busy{position:fixed;top:0;left:0;right:0;height:3px;background:var(--warn);z-index:60;animation:b 1s linear infinite}
 @keyframes b{0%{opacity:.3}50%{opacity:1}100%{opacity:.3}}
 .login{max-width:420px;margin:40px auto;padding:0 16px}
@@ -86,6 +113,8 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 
 #demo{background:var(--warn-soft);color:var(--warn);padding:10px 16px;font-size:13px;line-height:1.5}
 #demo>b{display:block;font-size:14px}
+#demo .qs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+#demo .qs button{border:1px solid currentColor;background:transparent;color:inherit;border-radius:99px;padding:5px 10px;font:inherit;font-size:13px;font-weight:700}
 #guide{margin-top:10px;background:var(--card);color:var(--ink);border-radius:10px;padding:10px 12px}
 #guide summary{font-weight:700;color:var(--pri);cursor:pointer}
 #guide ol{padding-left:1.3em;margin:8px 0}
@@ -94,34 +123,34 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 #guide dt{font-weight:700;margin-top:6px}
 #guide dd{margin:0;color:var(--sub)}
 #guide p{margin:8px 0 0;color:var(--sub)}
-#demo .qs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-#demo .qs button{border:1px solid currentColor;background:transparent;color:inherit;border-radius:99px;padding:5px 10px;font:inherit;font-size:13px;font-weight:700}
 @media (prefers-reduced-motion:reduce){#busy{animation:none}}
+@media print{#demo{display:none!important}}
 </style>
 </head>
 <body>
 
 
 <div id="busy" hidden></div>
-<div id="demo"><b>お試し版（GASにはつながっていません）</b>データはこの画面の中だけで、再読み込みすると元に戻ります。下のボタンで立場を切り替えて、流れを確かめられます。
+<div id="demo"><b>お試し版（GASにはつながっていません）</b>データはこの画面の中だけで、再読み込みすると空に戻ります。下のボタンで立場を切り替えて、流れを確かめられます。
 <div class="qs" id="demoQs"></div><details id="guide" open><summary>使い方（空の状態から始めます）</summary>
 <ol>
-<li><b>栗原（事務局）</b>を押す →「設定」→「メンバーと暗証番号」の＋追加で、カワヨの担当者と農家を登録（農家は「いつもの積み込み」も選ぶ）</li>
+<li><b>栗原（事務局）</b>を押す →「設定」→「メンバーと暗証番号」の＋追加で、カワヨの担当者と農家を登録（農家は「いつもの積み込み」も選ぶ）。同じ画面で品目のkg単価と組合手数料も入れておく</li>
 <li>登録した人のボタンが上に増えます。<b>農家</b>を押す →「出せるロール」で品目とロール数を登録</li>
 <li><b>カワヨの担当者</b>を押す →「発注する」で品目とkgを入れる（ロール数が自動で出ます）</li>
 <li><b>事務局</b>に戻る →「＋農家に振り分け」で農家とロール数を決める</li>
 <li><b>カワヨ</b>で候補日を入れる → <b>農家</b>で日付をタップして確定 → <b>カワヨ</b>で実際の納品kgを入力</li>
-<li><b>事務局</b>の「納品・精算」で農家ごとの納品kgを確認（kg単価・手数料は「設定」で入れると金額も出ます）</li>
+<li><b>事務局</b>の「伝票」で、カワヨへの請求書と農家ごとの支払明細書を月締めで発行 → カワヨの「請求書」、農家の「支払明細」タブに届きます</li>
 </ol>
 <dl>
-<dt>事務局（碓永さん・栗原）</dt><dd>発注を見て農家に振り分け。全農家の在庫・精算・設定（品目、1ロールの重さ、kg単価、手数料）が見られます</dd>
-<dt>カワヨ</dt><dd>品目とkgで発注 → 引き取り候補日を入れる → 実際の納品kgを入力</dd>
-<dt>農家</dt><dd>出せるロール数を登録 → 候補日から都合のいい日を選ぶ。積み込み（農家が積む／カワヨがフォークで積む）もここで選べます。ほかの農家の数字は見えません</dd>
+<dt>事務局（碓永さん・栗原）</dt><dd>発注を見て農家に振り分け。全農家の在庫・精算・伝票の発行と入金／支払の管理・設定（品目、1ロールの重さ、kg単価、手数料、伝票に載せる住所や振込先）</dd>
+<dt>カワヨ</dt><dd>品目とkgで発注 → 引き取り候補日を入れる → 実際の納品kgを入力 → 組合からの請求書を確認</dd>
+<dt>農家</dt><dd>出せるロール数を登録 → 候補日から都合のいい日を選ぶ。積み込み（農家が積む／カワヨがフォークで積む）もここで選べます → 組合からの支払明細書を確認。ほかの農家の数字は見えません</dd>
 </dl>
-<p>本番では、各自が自分の名前と4桁の暗証番号でログインし、振り分けや日程確定がLINEに通知されます。</p>
+<p>伝票の金額：請求書＝納品kg×kg単価、支払明細書＝納品kg×（kg単価−組合手数料）、どちらも消費税は設定の税率で計算。本番では各自が名前と4桁の暗証番号でログインし、振り分け・日程確定・伝票の発行がLINEに通知されます。</p>
 </details></div>
 <div id="app"></div>
 <div id="toast" hidden></div>
+<div id="printArea"></div>
 <div id="modal" hidden><div class="sheet" id="sheet"></div></div>
 
 <script>
@@ -152,7 +181,7 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 
 const DEFAULTS = {
   admin: { name: '栗原', pin: '1129' },
-  settings: { kumiaiName: '兵庫県自給飼料生産組合', buyerName: '西日本カワヨ株式会社', feePerKg: '' },
+  settings: { kumiaiName: '兵庫県自給飼料生産組合', buyerName: '西日本カワヨ株式会社', feePerKg: '', taxRate: '10', issuerAddress: '', issuerTel: '', invoiceNo: '', bankInfo: '', payTerms: '翌月末' },
   items: [['スーダンソルゴー', 450], ['イタリアン', 300], ['麦わら', 150], ['わら', 100]]
 };
 
@@ -162,9 +191,11 @@ const TABLES = {
   stocks:   ['id', 'farmerId', 'itemId', 'rolls', 'note', 'updatedAt'],
   orders:   ['id', 'itemId', 'kg', 'dueDate', 'note', 'createdBy', 'createdAt', 'cancelled'],
   allocs:   ['id', 'orderId', 'farmerId', 'rolls', 'candidates', 'date', 'loader', 'deliveredKg', 'deliveredAt', 'status', 'updatedAt'],
-  settings: ['key', 'value']
+  settings: ['key', 'value'],
+  docs:     ['id', 'type', 'month', 'toId', 'number', 'lines', 'subtotal', 'tax', 'total', 'taxRate', 'status', 'issuedAt', 'updatedAt', 'cancelled']
 };
-const JSON_COLS = { allocs: ['candidates'] };
+const JSON_COLS = { allocs: ['candidates'], docs: ['lines'] };
+const DOC_ST = { ISSUED: '発行済', PAID: '入金済', PAYOUT: '支払済' };
 const ROLE_LABEL = { admin: '事務局', buyer: '引き取り側', farmer: '農家' };
 const ST = { ALLOC: '振り分け済', PROPOSED: '候補日提示', FIXED: '日程確定', DONE: '納品済' };
 
@@ -321,11 +352,15 @@ function view_(D, me) {
   const meOut = { id: me.id, name: me.name, role: me.role, loader: me.loader || 'farmer', linked: !!me.lineUserId };
   const alloc = a => ({ id: a.id, orderId: a.orderId, farmerId: a.farmerId, rolls: Number(a.rolls), candidates: a.candidates || [], date: a.date, loader: a.loader, deliveredKg: num_(a.deliveredKg), deliveredAt: a.deliveredAt, status: a.status });
   const order = o => ({ id: o.id, itemId: o.itemId, kg: Number(o.kg), dueDate: o.dueDate, note: o.note, createdAt: o.createdAt, cancelled: o.cancelled === '1' });
-  const base = { me: meOut, settings: { kumiaiName: S.kumiaiName, buyerName: S.buyerName } };
+  const issuer = { kumiaiName: S.kumiaiName, buyerName: S.buyerName, taxRate: num_(S.taxRate), issuerAddress: S.issuerAddress, issuerTel: S.issuerTel, invoiceNo: S.invoiceNo, bankInfo: S.bankInfo, payTerms: S.payTerms };
+  const doc = d => ({ id: d.id, type: d.type, month: d.month, toId: d.toId, number: d.number, lines: d.lines || [], subtotal: Number(d.subtotal), tax: Number(d.tax), total: Number(d.total), taxRate: Number(d.taxRate), status: d.status, issuedAt: d.issuedAt });
+  const liveDocs = D.docs.filter(d => d.cancelled !== '1');
+  const base = { me: meOut, settings: issuer };
 
   if (me.role === 'admin') {
     return Object.assign(base, {
-      settings: { kumiaiName: S.kumiaiName, buyerName: S.buyerName, feePerKg: num_(S.feePerKg) },
+      settings: Object.assign({}, issuer, { feePerKg: num_(S.feePerKg) }),
+      docs: liveDocs.map(doc),
       items,
       users: D.users.filter(active_).map(u => ({ id: u.id, name: u.name, role: u.role, pin: u.pin, loader: u.loader || 'farmer', linked: !!u.lineUserId })),
       stocks: D.stocks.map(s => ({ id: s.id, farmerId: s.farmerId, itemId: s.itemId, rolls: Number(s.rolls), note: s.note, updatedAt: s.updatedAt })),
@@ -338,7 +373,8 @@ function view_(D, me) {
       items: items.map(i => ({ id: i.id, name: i.name, kgPerRoll: i.kgPerRoll, active: i.active, sort: i.sort })),
       users: D.users.filter(u => u.role === 'farmer').map(u => ({ id: u.id, name: u.name, role: u.role })),
       orders: D.orders.map(order),
-      allocs: D.allocs.map(alloc)
+      allocs: D.allocs.map(alloc),
+      docs: liveDocs.filter(d => d.type === 'inv').map(doc)
     });
   }
   // 農家：自分の分だけ
@@ -349,7 +385,8 @@ function view_(D, me) {
     users: [{ id: me.id, name: me.name, role: me.role }],
     stocks: D.stocks.filter(s => s.farmerId === me.id).map(s => ({ id: s.id, farmerId: s.farmerId, itemId: s.itemId, rolls: Number(s.rolls), note: s.note, updatedAt: s.updatedAt })),
     orders: D.orders.filter(o => oids.has(o.id)).map(o => ({ id: o.id, itemId: o.itemId, dueDate: o.dueDate, cancelled: o.cancelled === '1' })),
-    allocs: mine.map(alloc)
+    allocs: mine.map(alloc),
+    docs: liveDocs.filter(d => d.type === 'pay' && d.toId === me.id).map(doc)
   });
 }
 
@@ -489,6 +526,7 @@ const ACTIONS = {
     const a = ctx.D.allocs.find(x => x.id === p.id);
     if (!a) throw new Error('見つかりません');
     if (ctx.me.role === 'buyer' && a.status !== ST.FIXED) throw new Error('引き取り日が確定してから入力してください');
+    if (onDoc_(ctx.D, a.id)) throw new Error('伝票を発行済みのため変更できません。先に伝票を取り消してください');
     const kg = Number(p.kg);
     if (!(kg > 0)) throw new Error('納品kgを入力してください');
     a.deliveredKg = String(kg); a.deliveredAt = now_(); a.status = ST.DONE; a.updatedAt = now_();
@@ -546,9 +584,85 @@ const ACTIONS = {
     set('kumiaiName', String(p.kumiaiName || '').trim() || DEFAULTS.settings.kumiaiName);
     set('buyerName', String(p.buyerName || '').trim() || DEFAULTS.settings.buyerName);
     set('feePerKg', String(fee));
+    if (p.taxRate !== undefined) {
+      const tr = Number(p.taxRate);
+      if (!(tr >= 0 && tr <= 30)) throw new Error('消費税率が正しくありません');
+      set('taxRate', String(tr));
+    }
+    ['issuerAddress', 'issuerTel', 'invoiceNo', 'bankInfo', 'payTerms'].forEach(k => { if (p[k] !== undefined) set(k, String(p[k] || '').trim()); });
     mark_(ctx, 'settings');
   }
 };
+
+/* ---------- 伝票 ---------- */
+// 請求書(inv)：組合→引き取り側（納品kg×kg単価）
+// 支払明細(pay)：組合→農家（納品kg×(kg単価−組合手数料)）
+function onDoc_(D, allocId) {
+  return D.docs.some(d => d.cancelled !== '1' && (d.lines || []).some(l => l.allocId === allocId));
+}
+function docLines_(D, type, month, farmerId) {
+  const S = settings_(D), fee = num_(S.feePerKg) || 0;
+  return D.allocs
+    .filter(a => a.status === ST.DONE && String(a.date || '').slice(0, 7) === month && (type === 'inv' || a.farmerId === farmerId))
+    .map(a => {
+      const o = D.orders.find(x => x.id === a.orderId), it = item_(D, o.itemId);
+      const base = num_(it.unitPrice);
+      if (base == null) throw new Error(`「${it.name}」のkg単価が未設定です（設定で入力してください）`);
+      const price = type === 'inv' ? base : Math.round((base - fee) * 100) / 100;
+      const kg = Number(a.deliveredKg);
+      return { allocId: a.id, date: a.date, farmer: (user_(D, a.farmerId) || {}).name || '', item: it.name, rolls: Number(a.rolls), kg, price, amount: Math.round(kg * price) };
+    })
+    .sort((x, y) => x.date.localeCompare(y.date) || x.farmer.localeCompare(y.farmer, 'ja'));
+}
+function addDocActions_() {
+  ACTIONS.issueDoc = function (ctx, p) {
+    need_(ctx, 'admin');
+    const D = ctx.D, type = p.type, month = String(p.month || '');
+    if (!['inv', 'pay'].includes(type)) throw new Error('伝票の種類が正しくありません');
+    if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('対象月が正しくありません');
+    let toId = '';
+    if (type === 'pay') {
+      const f = user_(D, p.farmerId);
+      if (!f || f.role !== 'farmer') throw new Error('農家を選んでください');
+      toId = f.id;
+    }
+    if (D.docs.some(d => d.cancelled !== '1' && d.type === type && d.month === month && d.toId === toId)) throw new Error('この月の伝票はすでに発行済みです');
+    const lines = docLines_(D, type, month, toId);
+    if (!lines.length) throw new Error('この月の納品がありません');
+    const S = settings_(D), rate = num_(S.taxRate) == null ? 10 : Number(S.taxRate);
+    const subtotal = lines.reduce((s, l) => s + l.amount, 0);
+    const tax = Math.floor(subtotal * rate / 100);
+    const seq = D.docs.filter(d => d.type === type && d.month === month).length + 1;
+    const number = (type === 'inv' ? 'S' : 'P') + month.replace('-', '') + '-' + String(seq).padStart(2, '0');
+    D.docs.push({ id: id_(), type, month, toId, number, lines, subtotal: String(subtotal), tax: String(tax), total: String(subtotal + tax), taxRate: String(rate), status: DOC_ST.ISSUED, issuedAt: now_(), updatedAt: now_(), cancelled: '' });
+    mark_(ctx, 'docs');
+    const m = Number(month.slice(5)) + '月分';
+    const yen = n => '¥' + Number(n).toLocaleString();
+    if (type === 'inv') notify_(ctx, roleIds_(D, 'buyer'), `【請求書】${S.kumiaiName}より${m}の請求書（${number}）を発行しました\n合計 ${yen(subtotal + tax)}（税込）\nアプリの「伝票」で確認できます`);
+    else notify_(ctx, [toId], `【支払明細】${m}の支払明細書（${number}）を発行しました\nお支払い額 ${yen(subtotal + tax)}（税込）\nアプリの「伝票」で確認できます`);
+  };
+  ACTIONS.setDocStatus = function (ctx, p) {
+    need_(ctx, 'admin');
+    const d = ctx.D.docs.find(x => x.id === p.id && x.cancelled !== '1');
+    if (!d) throw new Error('伝票が見つかりません');
+    const ok = d.type === 'inv' ? [DOC_ST.ISSUED, DOC_ST.PAID] : [DOC_ST.ISSUED, DOC_ST.PAYOUT];
+    if (!ok.includes(p.status)) throw new Error('状態が正しくありません');
+    d.status = p.status; d.updatedAt = now_();
+    mark_(ctx, 'docs');
+    if (d.type === 'pay' && p.status === DOC_ST.PAYOUT) notify_(ctx, [d.toId], `【お支払い】${Number(d.month.slice(5))}月分（${d.number}）¥${Number(d.total).toLocaleString()} をお支払いしました`);
+  };
+  ACTIONS.cancelDoc = function (ctx, p) {
+    need_(ctx, 'admin');
+    const d = ctx.D.docs.find(x => x.id === p.id && x.cancelled !== '1');
+    if (!d) throw new Error('伝票が見つかりません');
+    if (d.status !== DOC_ST.ISSUED) throw new Error('入金・支払済みの伝票は取り消せません。先に状態を「発行済」に戻してください');
+    d.cancelled = '1'; d.updatedAt = now_();
+    mark_(ctx, 'docs');
+    const to = d.type === 'inv' ? roleIds_(ctx.D, 'buyer') : [d.toId];
+    notify_(ctx, to, `【伝票の取り消し】${d.number} は取り消しました`);
+  };
+}
+addDocActions_();
 
 /* ---------- LINE ---------- */
 function sendAll_(msgs) {
@@ -730,9 +844,9 @@ function logout(){ auth=null; S=null; LS.del('auth'); showLogin(); }
 
 /* ---------- 画面の骨組み ---------- */
 const TABS = {
-  admin:[['orders','発注・振り分け'],['stock','農家の在庫'],['settle','納品・精算'],['setup','設定']],
-  buyer:[['new','発注する'],['orders','発注一覧'],['pickup','引き取り予定']],
-  farmer:[['mine','引き取り予定'],['stock','出せるロール']]
+  admin:[['orders','発注・振り分け'],['stock','農家の在庫'],['settle','納品・精算'],['docs','伝票'],['setup','設定']],
+  buyer:[['new','発注する'],['orders','発注一覧'],['pickup','引き取り予定'],['docs','請求書']],
+  farmer:[['mine','引き取り予定'],['stock','出せるロール'],['docs','支払明細']]
 };
 function render(){
   try{demoButtons()}catch(e){}
@@ -926,6 +1040,14 @@ const VIEWS = {
       <label for="stK">組合名</label><input id="stK" value="${esc(S.settings.kumiaiName||'')}">
       <label for="stB">引き取り側（発注元）</label><input id="stB" value="${esc(S.settings.buyerName||'')}">
       <label for="stF">組合手数料（円/kg・未定なら空欄）</label><input id="stF" type="number" inputmode="decimal" step="0.1" min="0" value="${S.settings.feePerKg??''}">
+      <hr><h3>伝票に載せる情報</h3>
+      <p class="muted">請求書・支払明細の発行元（組合名の下）に表示されます。未定の項目は空欄のままで大丈夫です。</p>
+      <label for="stA">住所</label><input id="stA" value="${esc(S.settings.issuerAddress||'')}">
+      <label for="stT">電話番号</label><input id="stT" value="${esc(S.settings.issuerTel||'')}">
+      <label for="stI">インボイス登録番号（T＋13桁・未登録なら空欄）</label><input id="stI" value="${esc(S.settings.invoiceNo||'')}" placeholder="T1234567890123">
+      <label for="stR">消費税率（％）</label><input id="stR" type="number" inputmode="decimal" min="0" max="30" value="${S.settings.taxRate??10}">
+      <label for="stBk">振込先（請求書に表示）</label><textarea id="stBk" placeholder="例：〇〇銀行 〇〇支店 普通 1234567 名義">${esc(S.settings.bankInfo||'')}</textarea>
+      <label for="stP">支払期限・支払日の書き方</label><input id="stP" value="${esc(S.settings.payTerms||'')}" placeholder="例：翌月末">
       <div style="margin-top:10px"><button class="btn" onclick="saveSettings()">保存</button></div></div>
     <div class="card"><div class="row"><h3 class="grow">品目と1ロールの重さ</h3><button class="btn sm sub" onclick="itemModal('')">＋ 追加</button></div>
       <table><thead><tr><th>品目</th><th class="n">1ロール</th><th class="n">kg単価</th><th></th></tr></thead><tbody>
@@ -1012,7 +1134,7 @@ function adminNewOrder(){
 }
 
 /* ---------- 設定 ---------- */
-function saveSettings(){ act('saveSettings',{kumiaiName:$('#stK').value,buyerName:$('#stB').value,feePerKg:$('#stF').value},'保存しました'); }
+function saveSettings(){ act('saveSettings',{kumiaiName:$('#stK').value,buyerName:$('#stB').value,feePerKg:$('#stF').value,issuerAddress:$('#stA').value,issuerTel:$('#stT').value,invoiceNo:$('#stI').value,taxRate:$('#stR').value,bankInfo:$('#stBk').value,payTerms:$('#stP').value},'保存しました'); }
 function itemModal(id){
   const i=id?S.items.find(x=>x.id===id):{name:'',kgPerRoll:'',unitPrice:null,active:true};
   openModal(`<h3>${id?'品目を変更':'品目を追加'}</h3>
@@ -1048,12 +1170,120 @@ function csvSettle(){
   l.href=URL.createObjectURL(b); l.download=`納品明細_${ui.month}.csv`; document.body.appendChild(l); l.click(); l.remove();
 }
 
+/* ---------- 伝票 ---------- */
+const DOCNAME = {inv:'請求書', pay:'支払明細書'};
+const monthLabel = m => m ? m.slice(0,4)+'年'+Number(m.slice(5))+'月分' : '';
+function docStTag(d){
+  if(d.status==='入金済') return '<span class="tag ok">入金済</span>';
+  if(d.status==='支払済') return '<span class="tag ok">支払済</span>';
+  return '<span class="tag info">発行済</span>';
+}
+function slipHtml(d){
+  const st=S.settings, inv=d.type==='inv';
+  const to = inv ? (st.buyerName||'') : (d.lines[0]?.farmer || user(d.toId).name || '');
+  const rows=d.lines.map(l=>`<tr><td>${esc(md(l.date))}</td>${inv?`<td>${esc(l.farmer)}</td>`:''}<td>${esc(l.item)}</td><td class="n">${l.rolls}</td><td class="n">${fmt(l.kg)}</td><td class="n">${fmt(l.price)}</td><td class="n">${fmt(l.amount)}</td></tr>`).join('');
+  const kg=d.lines.reduce((a,l)=>a+l.kg,0), rl=d.lines.reduce((a,l)=>a+l.rolls,0);
+  return `<div class="slip">
+    <h2>${DOCNAME[d.type]}</h2>
+    <div class="top">
+      <div><div class="to">${esc(to)}　${inv?'御中':'様'}</div>
+        <p style="margin:8px 0 0">${inv?`${esc(monthLabel(d.month))}の納品について、下記のとおりご請求申し上げます。`:`${esc(monthLabel(d.month))}にご出荷いただいた粗飼料の代金を、下記のとおりお支払いします。`}</p></div>
+      <div class="from"><div class="meta">No. ${esc(d.number)}<br>発行日 ${esc((d.issuedAt||'').slice(0,10).replace(/-/g,'/'))}</div>
+        <div style="margin-top:8px"><b>${esc(st.kumiaiName||'')}</b>${st.issuerAddress?'<br>'+esc(st.issuerAddress):''}${st.issuerTel?'<br>TEL '+esc(st.issuerTel):''}${st.invoiceNo?'<br>登録番号 '+esc(st.invoiceNo):''}</div></div>
+    </div>
+    <div class="totalbox"><span>${inv?'ご請求金額':'お支払い金額'}（税込）</span><span>¥${fmt(d.total)}</span></div>
+    <div class="slipwrap"><table><thead><tr><th>納品日</th>${inv?'<th>出荷農家</th>':''}<th>品目</th><th class="n">ロール</th><th class="n">納品kg</th><th class="n">単価(円/kg)</th><th class="n">金額(円)</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot>
+      <tr class="tot"><td colspan="${inv?3:2}">合計</td><td class="n">${rl}</td><td class="n">${fmt(kg)}</td><td></td><td class="n">${fmt(d.subtotal)}</td></tr>
+      <tr><td colspan="${inv?6:5}" class="n">消費税（${d.taxRate}%対象 ${fmt(d.subtotal)}円）</td><td class="n">${fmt(d.tax)}</td></tr>
+      <tr class="tot"><td colspan="${inv?6:5}" class="n">税込合計</td><td class="n">${fmt(d.total)}</td></tr>
+    </tfoot></table></div>
+    <div class="note">${inv
+      ? `${st.payTerms?'お支払期限：'+esc(st.payTerms)+'\n':''}${st.bankInfo?'お振込先：'+esc(st.bankInfo):''}`
+      : `${st.payTerms?'お支払日：'+esc(st.payTerms)+'\n':''}${!inv?'単価は組合のkg単価から組合手数料を差し引いた金額です。':''}`}</div>
+  </div>`;
+}
+function showSlip(id){
+  const d=(S.docs||[]).find(x=>x.id===id); if(!d) return;
+  openModal(`<div class="row" style="margin-bottom:10px"><h3 class="grow" style="margin:0">${DOCNAME[d.type]}　${esc(d.number)}</h3>${docStTag(d)}</div>
+    ${slipHtml(d)}
+    <div class="row" style="margin-top:14px"><button class="btn sub grow" onclick="closeModal()">閉じる</button><button class="btn grow" onclick="printSlip('${d.id}')">印刷・PDF保存</button></div>
+    <p class="muted">PDFにするときは、印刷画面で「PDFとして保存」を選んでください。</p>`);
+}
+function printSlip(id){
+  const d=(S.docs||[]).find(x=>x.id===id); if(!d) return;
+  $('#printArea').innerHTML=slipHtml(d);
+  document.title=DOCNAME[d.type]+'_'+d.number;
+  try{ window.print(); }catch(e){ toast('この画面からは印刷できません',true); }
+  setTimeout(()=>{document.title='自給飼料 発注管理'},1000);
+}
+function docMonths(){
+  const ms=new Set((S.allocs||[]).filter(a=>a.status==='納品済').map(a=>(a.date||'').slice(0,7)));
+  (S.docs||[]).forEach(d=>ms.add(d.month)); ms.add(ym(new Date()));
+  return [...ms].filter(Boolean).sort().reverse();
+}
+function docPreview(type, month, farmerId){
+  const fee=S.settings.feePerKg||0, rate=S.settings.taxRate==null?10:S.settings.taxRate;
+  const al=(S.allocs||[]).filter(a=>a.status==='納品済' && (a.date||'').slice(0,7)===month && (type==='inv'||a.farmerId===farmerId));
+  let sub=0, kg=0, noPrice=[];
+  al.forEach(a=>{const o=S.orders.find(x=>x.id===a.orderId), it=item(o.itemId); kg+=a.deliveredKg;
+    if(it.unitPrice==null){ if(!noPrice.includes(it.name)) noPrice.push(it.name); return; }
+    sub+=Math.round(a.deliveredKg*(type==='inv'?it.unitPrice:Math.round((it.unitPrice-fee)*100)/100));});
+  return {n:al.length, kg, sub, total:sub+Math.floor(sub*rate/100), noPrice, ids:al.map(a=>a.id)};
+}
+function docCard(type, month, title, farmerId){
+  const d=(S.docs||[]).find(x=>x.type===type && x.month===month && (type==='inv'||x.toId===farmerId));
+  const pv=docPreview(type, month, farmerId);
+  if(d){
+    const onDoc=new Set(d.lines.map(l=>l.allocId)), extra=pv.ids.filter(i=>!onDoc.has(i)).length;
+    const paidSt = type==='inv'?'入金済':'支払済';
+    return `<div class="card"><div class="row"><h3 class="grow">${esc(title)}</h3>${docStTag(d)}</div>
+      <div class="muted">${DOCNAME[type]} ${esc(d.number)}・${d.lines.length}件・${fmt(d.lines.reduce((a,l)=>a+l.kg,0))}kg</div>
+      <div class="big">¥${fmt(d.total)}<small style="font-size:13px">（税込）</small></div>
+      ${extra?`<div class="tag warn" style="margin:4px 0">発行後に納品が${extra}件増えています（取り消して発行し直すと入ります）</div>`:''}
+      <div class="row" style="margin-top:8px"><button class="btn sm" onclick="showSlip('${d.id}')">表示・印刷</button>
+        ${d.status==='発行済'?`<button class="btn sm sub" onclick="setDocSt('${d.id}','${paidSt}')">${paidSt}にする</button><button class="btn sm danger" onclick="cancelDocC('${d.id}')">取り消す</button>`:`<button class="btn sm sub" onclick="setDocSt('${d.id}','発行済')">発行済に戻す</button>`}</div></div>`;
+  }
+  if(!pv.n) return `<div class="card"><div class="row"><h3 class="grow">${esc(title)}</h3><span class="tag">納品なし</span></div><div class="muted">この月の納品はありません</div></div>`;
+  return `<div class="card"><div class="row"><h3 class="grow">${esc(title)}</h3><span class="tag warn">未発行</span></div>
+    <div class="muted">${pv.n}件・${fmt(pv.kg)}kg</div>
+    ${pv.noPrice.length?`<div class="tag bad" style="margin:4px 0">kg単価が未設定：${esc(pv.noPrice.join('、'))}（設定で入力）</div>`:`<div class="big">¥${fmt(pv.total)}<small style="font-size:13px">（税込・見込み）</small></div>`}
+    <div style="margin-top:8px"><button class="btn sm" ${pv.noPrice.length?'disabled':''} onclick="issueDocC('${type}','${month}','${farmerId||''}')">${DOCNAME[type]}を発行</button></div></div>`;
+}
+function issueDocC(type, month, farmerId){
+  const who = type==='inv' ? S.settings.buyerName : user(farmerId).name+'さん';
+  confirmBox(`${monthLabel(month)}の${DOCNAME[type]}を${who}あてに発行します。発行すると相手のアプリに表示され、LINEで知らせます。`,'発行する',
+    ()=>act('issueDoc',{type,month,farmerId},'発行しました'));
+}
+function setDocSt(id, st){ act('setDocStatus',{id,status:st}, st+'にしました'); }
+function cancelDocC(id){ confirmBox('この伝票を取り消しますか？相手の画面からも消え、取り消しの通知が届きます。','取り消す',()=>act('cancelDoc',{id},'取り消しました'),true); }
+VIEWS['admin:docs']=function(){
+  const months=docMonths(); if(!ui.docMonth||!months.includes(ui.docMonth)) ui.docMonth=months.find(m=>(S.allocs||[]).some(a=>a.status==='納品済'&&(a.date||'').slice(0,7)===m))||months[0];
+  const m=ui.docMonth, farmers=(S.users||[]).filter(u=>u.role==='farmer');
+  const delivF=new Set((S.allocs||[]).filter(a=>a.status==='納品済'&&(a.date||'').slice(0,7)===m).map(a=>a.farmerId));
+  (S.docs||[]).filter(d=>d.type==='pay'&&d.month===m).forEach(d=>delivF.add(d.toId));
+  const fs=farmers.filter(f=>delivF.has(f.id));
+  return `<div class="row" style="margin-bottom:10px"><label for="dmSel" style="margin:0">対象月</label><select id="dmSel" style="width:auto" onchange="ui.docMonth=this.value;render()">${months.map(x=>`<option value="${x}" ${x===m?'selected':''}>${monthLabel(x)}</option>`).join('')}</select></div>
+    <p class="muted">月締めで発行します。請求書＝組合から${esc(buyerShort())}へ（納品kg×kg単価）、支払明細書＝組合から農家へ（納品kg×（kg単価−組合手数料））。発行した伝票は相手のアプリにも表示されます。</p>
+    <h3>${esc(buyerShort())}への請求書</h3>${docCard('inv',m,S.settings.buyerName||'引き取り側')}
+    <h3 style="margin-top:18px">農家への支払明細書</h3>${fs.length?fs.map(f=>docCard('pay',m,f.name+'さん',f.id)).join(''):'<div class="empty">この月に納品した農家はいません</div>'}`;
+};
+function docListView(emptyMsg){
+  const ds=(S.docs||[]).slice().sort((a,b)=>b.month.localeCompare(a.month)||b.number.localeCompare(a.number));
+  if(!ds.length) return `<div class="empty">${emptyMsg}</div>`;
+  return ds.map(d=>`<div class="card"><div class="row"><h3 class="grow">${monthLabel(d.month)}　${DOCNAME[d.type]}</h3>${docStTag(d)}</div>
+    <div class="muted">No. ${esc(d.number)}・発行日 ${esc((d.issuedAt||'').slice(0,10).replace(/-/g,'/'))}・${d.lines.length}件</div>
+    <div class="row"><div class="big grow">¥${fmt(d.total)}<small style="font-size:13px">（税込）</small></div><button class="btn sm" onclick="showSlip('${d.id}')">表示・印刷</button></div></div>`).join('');
+}
+VIEWS['buyer:docs']=()=>docListView('まだ請求書は届いていません。月締めで組合から発行されます');
+VIEWS['farmer:docs']=()=>docListView('まだ支払明細書は届いていません。月締めで組合から発行されます');
+
 /* ---------- お試し：立場の切り替え ---------- */
 function demoSwitch(i){var g=document.getElementById('guide');if(g&&!window.__gd){g.open=false;window.__gd=1}auth=window.__demoUsers[i][1];tab=null;ui.orderFilter='open';S=window.__demoPost({action:'state',auth}).data;render();window.scrollTo(0,0)}
 /* ---------- 起動 ---------- */
 (async()=>{
-  demoSeed(); auth=null;
-  demoButtons();
+  demoSeed(); auth=null; demoButtons();
   if(auth){ try{ S=await api('state'); render(); return; }catch(e){ auth=null; LS.del('auth'); } }
   showLogin();
 })();
