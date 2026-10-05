@@ -104,12 +104,14 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 
 <div id="busy" hidden></div>
 <div id="demo"><b>お試し版（GASにはつながっていません）</b>データはこの画面の中だけで、再読み込みすると元に戻ります。下のボタンで立場を切り替えて、流れを確かめられます。
-<div class="qs" id="demoQs"></div><details id="guide" open><summary>使い方（3分で試せます）</summary>
+<div class="qs" id="demoQs"></div><details id="guide" open><summary>使い方（空の状態から始めます）</summary>
 <ol>
-<li><b>農家A</b>を押す → 届いている候補日（2つ）のどちらかをタップして確定</li>
-<li><b>カワヨ担当</b>を押す →「引き取り予定」→「納品kgを入力」に実際の重さ（例：2310）を入れる</li>
-<li><b>栗原（事務局）</b>を押す →「納品・精算」で農家ごとの納品kgと金額を確認</li>
-<li>ほかにも試せること：カワヨ担当の「発注する」でkgを入れるとロール数が自動で出ます／事務局の「＋農家に振り分け」で、農家が登録した在庫から割り振れます</li>
+<li><b>栗原（事務局）</b>を押す →「設定」→「メンバーと暗証番号」の＋追加で、カワヨの担当者と農家を登録（農家は「いつもの積み込み」も選ぶ）</li>
+<li>登録した人のボタンが上に増えます。<b>農家</b>を押す →「出せるロール」で品目とロール数を登録</li>
+<li><b>カワヨの担当者</b>を押す →「発注する」で品目とkgを入れる（ロール数が自動で出ます）</li>
+<li><b>事務局</b>に戻る →「＋農家に振り分け」で農家とロール数を決める</li>
+<li><b>カワヨ</b>で候補日を入れる → <b>農家</b>で日付をタップして確定 → <b>カワヨ</b>で実際の納品kgを入力</li>
+<li><b>事務局</b>の「納品・精算」で農家ごとの納品kgを確認（kg単価・手数料は「設定」で入れると金額も出ます）</li>
 </ol>
 <dl>
 <dt>事務局（碓永さん・栗原）</dt><dd>発注を見て農家に振り分け。全農家の在庫・精算・設定（品目、1ロールの重さ、kg単価、手数料）が見られます</dd>
@@ -603,24 +605,15 @@ function lineWebhook_(body) {
   window.__demoPost=b=>JSON.parse(doPost({postData:{contents:JSON.stringify(b)}}).t);
 })();
 function demoSeed(){
-  const P=window.__demoPost, names=P({action:'names'}).data, adm={uid:names[0].id,pin:'1129'};
-  const call=(action,x,a)=>P(Object.assign({action,auth:a||adm},x)).data;
-  let S=call('saveUser',{name:'カワヨ担当（お試し）',role:'buyer',pin:'1111'});
-  S=call('saveUser',{name:'農家A（お試し）',role:'farmer',pin:'2222',loader:'buyer'});
-  S=call('saveUser',{name:'農家B（お試し）',role:'farmer',pin:'3333',loader:'farmer'});
-  const U=nm=>S.users.find(u=>u.name===nm).id, it=nm=>S.items.find(i=>i.name===nm).id;
-  const K={uid:U('カワヨ担当（お試し）'),pin:'1111'}, A={uid:U('農家A（お試し）'),pin:'2222'}, B={uid:U('農家B（お試し）'),pin:'3333'};
-  call('saveStock',{itemId:it('スーダンソルゴー'),rolls:6,note:'倉庫前'},A);
-  call('saveStock',{itemId:it('イタリアン'),rolls:4},A);
-  call('saveStock',{itemId:it('スーダンソルゴー'),rolls:8},B);
-  call('saveStock',{itemId:it('わら'),rolls:20},B);
-  const d=k=>{const x=new Date(Date.now()+9*3600e3+k*864e5);return x.toISOString().slice(0,10)};
-  const o=call('createOrder',{itemId:it('スーダンソルゴー'),kg:4500,dueDate:d(20),note:'お試しの発注'},K).orders[0];
-  call('allocate',{orderId:o.id,farmerId:A.uid,rolls:5,loader:'buyer'});
-  const al=call('allocate',{orderId:o.id,farmerId:B.uid,rolls:5,loader:'farmer'}).allocs.find(a=>a.farmerId===A.uid);
-  call('proposeDates',{id:al.id,candidates:[d(8),d(10)]},K);
-  call('createOrder',{itemId:it('わら'),kg:1200,dueDate:d(25)},K);
-  window.__demoUsers=[['栗原（事務局）',adm],['カワヨ担当',K],['農家A',A],['農家B',B]];
+  const names=window.__demoPost({action:'names'}).data;
+  window.__demoAdmin={uid:names[0].id,pin:'1129'};
+}
+function demoButtons(){
+  const el=document.getElementById('demoQs'); if(!el) return;
+  const us=window.__demoPost({action:'state',auth:window.__demoAdmin}).data.users||[];
+  const g={admin:'事務局',buyer:'引き取り側',farmer:'農家'};
+  window.__demoUsers=us.map(u=>[u.name+'（'+g[u.role]+'）',{uid:u.id,pin:u.pin}]);
+  el.innerHTML=window.__demoUsers.map((u,i)=>`<button onclick="demoSwitch(${i})">${esc(u[0])}</button>`).join('');
 }
 
 /* ======== 設定：GASのウェブアプリURLを貼る ======== */
@@ -742,6 +735,7 @@ const TABS = {
   farmer:[['mine','引き取り予定'],['stock','出せるロール']]
 };
 function render(){
+  try{demoButtons()}catch(e){}
   if(!S){showLogin();return}
   const role=S.me.role, tabs=TABS[role];
   if(!tab || !tabs.some(t=>t[0]===tab)) tab=tabs[0][0];
@@ -1059,7 +1053,7 @@ function demoSwitch(i){var g=document.getElementById('guide');if(g&&!window.__gd
 /* ---------- 起動 ---------- */
 (async()=>{
   demoSeed(); auth=null;
-  $('#demoQs').innerHTML=window.__demoUsers.map((u,i)=>`<button onclick="demoSwitch(${i})">${u[0]}</button>`).join('');
+  demoButtons();
   if(auth){ try{ S=await api('state'); render(); return; }catch(e){ auth=null; LS.del('auth'); } }
   showLogin();
 })();
