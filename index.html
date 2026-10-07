@@ -410,7 +410,7 @@ function itemRow(it={}){
   const tax=(it.tax===''||it.tax==null)?8:Number(it.tax);
   d.innerHTML=`<input placeholder="商品名" list="prodList" value="${esc(it.name||'')}"><input type="number" inputmode="decimal" placeholder="数量" value="${esc(it.qty??'')}"><input placeholder="単位" value="${esc(it.unit||'')}"><input type="number" inputmode="numeric" placeholder="単価" value="${esc(it.price??'')}"><select><option value="8" ${tax===8?'selected':''}>8%</option><option value="10" ${tax===10?'selected':''}>10%</option><option value="0" ${tax===0?'selected':''}>0%</option></select><button type="button" title="削除">×</button>`;
   const [n,q,u,p]=d.querySelectorAll('input'); const t=d.querySelector('select');
-  n.addEventListener('change',()=>{ const m=master.products.find(x=>x.name===n.value.trim()); if(m){ if(!p.value&&m.price) p.value=m.price; if(!u.value&&m.unit) u.value=m.unit; t.value=String(m.tax); } updSub(); });
+  n.addEventListener('change',()=>{ const m=master.products.find(x=>x.name===n.value.trim()); if(m){ p.value=m.price||''; u.value=m.unit||''; t.value=String(m.tax); } else if(!n.value.trim()){ p.value=''; u.value=''; t.value='8'; } updSub(); });
   [q,p].forEach(el=>el.addEventListener('input',updSub)); t.addEventListener('change',updSub);
   d.querySelector('button').onclick=()=>{ d.remove(); if(!$('items').children.length) $('items').appendChild(itemRow()); updSub(); };
   return d;
