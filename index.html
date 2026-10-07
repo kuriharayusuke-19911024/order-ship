@@ -75,7 +75,21 @@ a{color:var(--kuri-2)}
 .f input,.f select,.f textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:#fff}
 .f textarea{min-height:70px;resize:vertical}
 .f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.irow{display:grid;grid-template-columns:1fr 70px 60px 32px;gap:6px;margin-bottom:6px;align-items:center}
+.irow{display:grid;grid-template-columns:1fr 62px 52px 84px 46px 28px;gap:4px;margin-bottom:6px;align-items:center}
+.irow input,.irow select{padding:8px 6px;font-size:14px}
+.irow select{border:1px solid var(--line);border-radius:8px;background:#fff}
+.ihead{display:grid;grid-template-columns:1fr 62px 52px 84px 46px 28px;gap:4px;font-size:11px;color:var(--sub);padding:0 4px 2px}
+.subtot{text-align:right;font-size:13px;color:var(--sub);margin:2px 0 4px}
+.subtot b{color:var(--ink);font-size:15px}
+.docline{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.docline a{font-size:14px}
+.chk{display:flex;align-items:center;gap:6px;font-size:13.5px}
+.chk input{width:18px;height:18px}
+.inv-row{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.inv-row .n{flex:1}
+.inv-row .n b{display:block;font-size:15px}
+.inv-row .n span{font-size:12.5px;color:var(--sub)}
+.inv-row .amt{font-weight:700;white-space:nowrap}
 .irow input{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 8px;background:#fff}
 .irow button{border:0;background:none;color:var(--sub);font-size:20px}
 .add{border:1px dashed var(--kuri-2);color:var(--kuri-2);background:none;border-radius:8px;padding:7px 12px;font-size:13.5px;width:100%}
@@ -123,6 +137,7 @@ a{color:var(--kuri-2)}
 <div class="tools">
   <input id="q" type="search" placeholder="注文元・商品・発送先で検索">
   <select id="sort"><option value="due">納期順</option><option value="new">新しい順</option></select>
+  <button class="ghost" id="openInv" style="padding:7px 10px;font-size:13.5px;white-space:nowrap">請求書</button>
 </div>
 <div class="list" id="list"></div>
 
@@ -139,8 +154,10 @@ a{color:var(--kuri-2)}
         <div class="f"><label>納期（発送希望日）</label><input type="date" id="fDue"></div>
       </div>
       <div class="f"><label>注文元（お客様・取引先）</label><input id="fCust" list="custList" placeholder="例：藤代商店" autocomplete="off"><datalist id="custList"></datalist></div>
-      <div class="f"><label>商品と数量</label>
+      <div class="f"><label>商品・数量・単価（税抜）</label>
+        <div class="ihead"><span>商品名</span><span>数量</span><span>単位</span><span>単価</span><span>税率</span><span></span></div>
         <div id="items"></div>
+        <div class="subtot" id="subtot"></div>
         <button class="add" id="addItem">＋ 商品を追加</button>
         <datalist id="prodList"></datalist>
       </div>
@@ -149,6 +166,10 @@ a{color:var(--kuri-2)}
       <div class="f2">
         <div class="f"><label>発送の担当者</label><select id="fAssignee"></select></div>
         <div class="f"><label>ステータス</label><select id="fStatus"></select></div>
+      </div>
+      <div class="f2">
+        <div class="f"><label>発送日（納品書の日付）</label><input type="date" id="fShipDate"></div>
+        <div class="f"><label>納品書</label><label class="chk" style="margin-top:8px"><input type="checkbox" id="fShowPrice" checked> 金額を載せる</label></div>
       </div>
       <div class="f"><label>メモ・伝えたいこと</label><textarea id="fMemo" placeholder="例：熨斗あり／クール便で"></textarea></div>
       <div class="f"><label>メールで来た注文はここに本文を貼る</label>
@@ -178,6 +199,17 @@ a{color:var(--kuri-2)}
   </div>
 </div>
 
+<!-- 月末請求 -->
+<div class="sheet" id="inv" hidden>
+  <div class="inner">
+    <div class="bar"><h2>請求書をまとめて作る</h2><button class="x" data-close="inv">×</button></div>
+    <div class="body">
+      <div class="f"><label>対象</label><div style="font-size:13.5px;color:var(--sub)">「発送済」で未請求の注文を、注文元ごとにまとめて1枚の請求書にします。作成後は「請求済」になります。</div></div>
+      <div id="invList"></div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -193,6 +225,23 @@ let orders = JSON.parse(localStorage.getItem('orders')||'[]');
 let pending = JSON.parse(localStorage.getItem('pending')||'[]');
 let me = localStorage.getItem('me')||'';
 let filter = 'all', pendingFile = null;
+let master = JSON.parse(localStorage.getItem('master')||'{"settings":{},"products":[]}');
+const yen = n=>'¥'+Math.round(Number(n)||0).toLocaleString('ja-JP');
+function calcItems(items){
+  const byTax={}; let sub=0;
+  (items||[]).forEach(i=>{ const a=(Number(i.qty)||0)*(Number(i.price)||0); const t=(i.tax===''||i.tax==null)?8:Number(i.tax); sub+=a; byTax[t]=(byTax[t]||0)+a; });
+  const tax=Object.keys(byTax).reduce((a,t)=>a+Math.floor(byTax[t]*(+t)/100),0);
+  return {sub,tax,total:sub+tax};
+}
+async function loadMaster(){
+  if(!API_URL) return;
+  try{ const r=await fetch(API_URL+'?action=master&t='+Date.now()); const j=await r.json(); if(j.products){ master=j; localStorage.setItem('master',JSON.stringify(master)); renderProdList(); } }catch(e){ console.error(e); }
+}
+function renderProdList(){
+  const names=new Set(master.products.map(p=>p.name));
+  orders.forEach(o=>(o.items||[]).forEach(i=>{ if(i.name) names.add(i.name); }));
+  $('prodList').innerHTML=[...names].map(c=>`<option value="${esc(c)}">`).join('');
+}
 
 const $ = id=>document.getElementById(id);
 const esc = s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -257,16 +306,17 @@ function render(){
   $('list').innerHTML = list.length ? list.map(card).join('') : `<div class="empty">${q?'該当する注文はありません':'注文はまだありません。右下の「＋ 注文を登録」から追加できます。'}</div>`;
   // datalists
   $('custList').innerHTML=[...new Set(orders.map(o=>o.customer).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('');
-  $('prodList').innerHTML=[...new Set(orders.flatMap(o=>(o.items||[]).map(i=>i.name)).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('');
+  renderProdList();
 }
 function itemsText(o){ return (o.items||[]).map(i=>`${i.name}${i.qty?` ×${i.qty}${i.unit||''}`:''}`).join('、')||'（商品未入力）'; }
+function orderTotal(o){ const c=calcItems(o.items); return c.sub? yen(c.total)+'（税込）' : ''; }
 function card(o){
   const si = STATUS.indexOf(o.status), c=SCOLOR[si];
   const late = o.due && o.due<today() && si<2;
   return `<div class="card ${o.assignee===me?'mine':''}" data-id="${o.id}" style="--c:${c}">
     <div class="h"><span class="cust">${esc(o.customer||'（注文元未入力）')}</span><span class="date">注文 ${fmt(o.orderDate)}</span></div>
     <div class="items">${esc(itemsText(o))}</div>
-    <div class="meta"><span class="${late?'late':''}">納期 ${fmt(o.due)}${late?'（遅れ）':''}</span><span>担当 ${esc(o.assignee||'未定')}</span>${o.shipTo?`<span>宛先 ${esc(o.shipTo)}</span>`:''}${o.fileUrl||o.fileData?`<span class="clip">📎 注文書あり</span>`:''}</div>
+    <div class="meta"><span class="${late?'late':''}">納期 ${fmt(o.due)}${late?'（遅れ）':''}</span><span>担当 ${esc(o.assignee||'未定')}</span>${o.shipTo?`<span>宛先 ${esc(o.shipTo)}</span>`:''}${orderTotal(o)?`<span>${orderTotal(o)}</span>`:''}${o.fileUrl||o.fileData?`<span class="clip">📎 注文書</span>`:''}${o.deliveryUrl?`<span class="clip">📄 納品書</span>`:''}${o.invoiceUrl?`<span class="clip">🧾 請求書</span>`:''}</div>
     <div class="steps">${STATUS.map((s,i)=>`<i class="${i<=si?'done':''}"></i>`).join('')}</div>
     <div class="stline"><span class="stname">${esc(o.status)}</span>${si<4?`<button class="next" data-next="${o.id}">${STEP_LABEL[si]}</button>`:'<span class="stname">完了</span>'}</div>
   </div>`;
@@ -281,9 +331,28 @@ function advance(id,dir){
   if(!me){ toast('先に右上で自分の名前を選んでください'); return; }
   const o=orders.find(x=>x.id===id); const i=STATUS.indexOf(o.status)+dir; if(i<0||i>=STATUS.length) return;
   o.status=STATUS[i]; (o.history=o.history||[]).push({at:now(),by:me,to:o.status});
+  if(dir>0 && o.status==='発送済' && !o.shipDate) o.shipDate=today();
   saveOrder(o); toast(`「${o.status}」にしました`);
-  if(dir>0 && o.status==='発送依頼') notifyLine(o);
+  if(dir>0 && o.status==='発送依頼'){ notifyLine(o); makeDelivery(o); }
   if(!$('detail').hidden) openDetail(id);
+}
+async function makeDelivery(o, force){
+  if(!API_URL) return;
+  if(!(o.items||[]).length) return;
+  try{
+    const r=await api({action:'delivery',order:o});
+    o.deliveryUrl=r.url; o.deliveryNo=r.no; saveOrder(o);
+    toast('納品書を作成しました'); if(!$('detail').hidden) openDetail(o.id);
+  }catch(err){ console.error(err); toast('納品書を作成できませんでした：'+err.message); }
+}
+async function makeInvoiceFor(list){
+  if(!API_URL||!list.length) return;
+  try{
+    const r=await api({action:'invoice',orders:list});
+    list.forEach(o=>{ o.invoiceUrl=r.url; o.invoiceNo=r.no; if(STATUS.indexOf(o.status)<3){ o.status='請求済'; (o.history=o.history||[]).push({at:now(),by:me||'（名前未設定）',to:'請求済'}); } saveOrder(o); });
+    toast(`請求書 ${r.no} を作成（${yen(r.total)}）`);
+    return r;
+  }catch(err){ console.error(err); toast('請求書を作成できませんでした：'+err.message); }
 }
 async function notifyLine(o){
   if(!API_URL || !o.assignee) return;
@@ -294,11 +363,17 @@ async function notifyLine(o){
 // ===== 登録・編集 =====
 function itemRow(it={}){
   const d=document.createElement('div'); d.className='irow';
-  d.innerHTML=`<input placeholder="商品名" list="prodList" value="${esc(it.name||'')}"><input type="number" inputmode="decimal" placeholder="数量" value="${esc(it.qty??'')}"><input placeholder="単位" value="${esc(it.unit||'')}"><button type="button" title="削除">×</button>`;
-  d.querySelector('button').onclick=()=>{ d.remove(); if(!$('items').children.length) $('items').appendChild(itemRow()); };
+  const tax=(it.tax===''||it.tax==null)?8:Number(it.tax);
+  d.innerHTML=`<input placeholder="商品名" list="prodList" value="${esc(it.name||'')}"><input type="number" inputmode="decimal" placeholder="数量" value="${esc(it.qty??'')}"><input placeholder="単位" value="${esc(it.unit||'')}"><input type="number" inputmode="numeric" placeholder="単価" value="${esc(it.price??'')}"><select><option value="8" ${tax===8?'selected':''}>8%</option><option value="10" ${tax===10?'selected':''}>10%</option><option value="0" ${tax===0?'selected':''}>0%</option></select><button type="button" title="削除">×</button>`;
+  const [n,q,u,p]=d.querySelectorAll('input'); const t=d.querySelector('select');
+  n.addEventListener('change',()=>{ const m=master.products.find(x=>x.name===n.value.trim()); if(m){ if(!p.value&&m.price) p.value=m.price; if(!u.value&&m.unit) u.value=m.unit; t.value=String(m.tax); } updSub(); });
+  [q,p].forEach(el=>el.addEventListener('input',updSub)); t.addEventListener('change',updSub);
+  d.querySelector('button').onclick=()=>{ d.remove(); if(!$('items').children.length) $('items').appendChild(itemRow()); updSub(); };
   return d;
 }
-$('addItem').onclick=()=>$('items').appendChild(itemRow());
+function readItems(){ return [...$('items').children].map(r=>{const [n,q,u,p]=r.querySelectorAll('input'); const t=r.querySelector('select'); return {name:n.value.trim(),qty:q.value,unit:u.value.trim(),price:p.value,tax:Number(t.value)};}).filter(i=>i.name); }
+function updSub(){ const c=calcItems(readItems()); $('subtot').innerHTML = c.sub ? `税抜 ${yen(c.sub)}　消費税 ${yen(c.tax)}　<b>合計 ${yen(c.total)}</b>` : ''; }
+$('addItem').onclick=()=>{ $('items').appendChild(itemRow()); };
 $('fAssignee').innerHTML='<option value="">未定</option>'+MEMBERS.map(m=>`<option>${m}</option>`).join('');
 $('fStatus').innerHTML=STATUS.map(s=>`<option>${s}</option>`).join('');
 function openForm(o){
@@ -307,7 +382,8 @@ function openForm(o){
   $('fId').value=o?.id||''; $('fDate').value=o?.orderDate||today(); $('fDue').value=o?.due||'';
   $('fCust').value=o?.customer||''; $('fShipTo').value=o?.shipTo||''; $('fAddr').value=o?.addr||'';
   $('fAssignee').value=o?.assignee||''; $('fStatus').value=o?.status||'受注'; $('fMemo').value=o?.memo||'';
-  $('items').innerHTML=''; ((o?.items?.length?o.items:[{}])).forEach(it=>$('items').appendChild(itemRow(it)));
+  $('items').innerHTML=''; ((o?.items?.length?o.items:[{}])).forEach(it=>$('items').appendChild(itemRow(it))); updSub();
+  $('fShipDate').value=o?.shipDate||''; $('fShowPrice').checked=o?.showPrice!==false;
   if(o?.fileName){ $('fileName').textContent='登録済み：'+o.fileName; }
   if(o?.fileUrl && o.fileType?.startsWith('image')){ $('fThumb').src=o.fileUrl; $('fThumb').hidden=false; }
   $('form').hidden=false; $('form').querySelector('.inner').scrollTop=0;
@@ -339,7 +415,7 @@ function applyRead(d){
   const set=(id,v)=>{ if(v && !$(id).value) $(id).value=v; };
   set('fDate',d.orderDate); set('fDue',d.due); set('fCust',d.customer); set('fShipTo',d.shipTo); set('fAddr',d.addr); set('fMemo',d.memo);
   const cur=[...$('items').children].some(r=>r.querySelector('input').value.trim());
-  if(!cur && Array.isArray(d.items) && d.items.length){ $('items').innerHTML=''; d.items.forEach(it=>$('items').appendChild(itemRow(it))); }
+  if(!cur && Array.isArray(d.items) && d.items.length){ $('items').innerHTML=''; d.items.forEach(it=>{ const m=master.products.find(x=>x.name===String(it.name||'').trim()); if(m){ it.price=it.price||m.price; it.unit=it.unit||m.unit; it.tax=m.tax; } $('items').appendChild(itemRow(it)); }); updSub(); }
 }
 $('readMail').onclick=async()=>{
   const t=$('fMail').value.trim(); if(!t){ toast('メール本文を貼り付けてください'); return; }
@@ -361,12 +437,13 @@ $('fCam').onchange=onFile; $('fFile').onchange=onFile;
 
 $('save').onclick=async()=>{
   const cust=$('fCust').value.trim(); if(!cust){ toast('注文元を入力してください'); $('fCust').focus(); return; }
-  const items=[...$('items').children].map(r=>{const [n,q,u]=r.querySelectorAll('input'); return {name:n.value.trim(),qty:q.value,unit:u.value.trim()};}).filter(i=>i.name);
+  const items=readItems();
   if(!items.length){ toast('商品を1つ以上入力してください'); return; }
   const id=$('fId').value; const old=orders.find(x=>x.id===id);
   const o = Object.assign({}, old||{id:uid(),createdAt:now(),createdBy:me,history:[]}, {
     orderDate:$('fDate').value, due:$('fDue').value, customer:cust, items, shipTo:$('fShipTo').value.trim(), addr:$('fAddr').value.trim(),
-    assignee:$('fAssignee').value, status:$('fStatus').value, memo:$('fMemo').value.trim()
+    assignee:$('fAssignee').value, status:$('fStatus').value, memo:$('fMemo').value.trim(),
+    shipDate:$('fShipDate').value, showPrice:$('fShowPrice').checked
   });
   if(!old) o.history.push({at:now(),by:me||'（名前未設定）',to:o.status+'（登録）'});
   else if(old.status!==o.status) o.history.push({at:now(),by:me||'（名前未設定）',to:o.status});
@@ -399,6 +476,13 @@ function openDetail(id){
       <b>担当</b><span>${esc(o.assignee||'未定')}</span>
       <b>メモ</b><span style="white-space:pre-wrap">${esc(o.memo)||'—'}</span>
       <b>注文書</b><span>${fileHtml}</span>
+      <b>金額</b><span>${orderTotal(o)||'—'}</span>
+    </div>
+    <div class="docline">
+      ${o.deliveryUrl?`<a href="${esc(o.deliveryUrl)}" target="_blank" rel="noopener">📄 納品書 ${esc(o.deliveryNo||'')}</a>`:''}
+      <button class="ghost" id="dDeliv" style="padding:7px 12px;font-size:13.5px">${o.deliveryUrl?'納品書を作り直す':'📄 納品書を作る'}</button>
+      ${o.invoiceUrl?`<a href="${esc(o.invoiceUrl)}" target="_blank" rel="noopener">🧾 請求書 ${esc(o.invoiceNo||'')}</a>`:''}
+      ${!o.invoiceUrl&&STATUS.indexOf(o.status)>=2?`<button class="ghost" id="dInv" style="padding:7px 12px;font-size:13.5px">🧾 この注文だけ請求書</button>`:''}
     </div>
     <div class="stbox" style="--c:${c}">
       <div class="now">いまのステータス</div><div class="big">${esc(o.status)}</div>
@@ -409,13 +493,29 @@ function openDetail(id){
     <div id="dConfirm"></div>`;
   $('dBody').querySelectorAll('[data-adv]').forEach(b=>b.onclick=()=>advance(o.id,+b.dataset.adv));
   $('dEdit').onclick=()=>{ $('detail').hidden=true; openForm(o); };
+  $('dDeliv').onclick=()=>{ if(!(o.items||[]).some(i=>i.name)){ toast('商品が未入力です'); return; } $('dDeliv').disabled=true; $('dDeliv').textContent='作成中…'; makeDelivery(o,true); };
+  const dInv=$('dInv'); if(dInv) dInv.onclick=async()=>{ dInv.disabled=true; dInv.textContent='作成中…'; await makeInvoiceFor([o]); openDetail(o.id); };
   $('dDel').onclick=()=>{ $('dConfirm').innerHTML=`<div class="confirm">この注文を削除しますか？<div class="btns"><button class="ghost danger" id="dYes">削除する</button><button class="ghost" id="dNo">やめる</button></div></div>`;
     $('dYes').onclick=()=>{ o.deleted=true; saveOrder(o); $('detail').hidden=true; toast('削除しました'); }; $('dNo').onclick=()=>$('dConfirm').innerHTML=''; };
   $('detail').hidden=false; $('detail').querySelector('.inner').scrollTop=0;
 }
 
+// ===== 月末請求 =====
+$('openInv').onclick=()=>{ renderInv(); $('inv').hidden=false; };
+function renderInv(){
+  const targets=visible().filter(o=>o.status==='発送済' && !o.invoiceUrl);
+  const groups={}; targets.forEach(o=>{ (groups[o.customer]=groups[o.customer]||[]).push(o); });
+  const keys=Object.keys(groups).sort();
+  $('invList').innerHTML = keys.length ? keys.map(k=>{
+    const list=groups[k]; const total=list.reduce((a,o)=>a+calcItems(o.items).total,0);
+    const noPrice=list.some(o=>!calcItems(o.items).sub);
+    return `<div class="inv-row"><div class="n"><b>${esc(k)}</b><span>${list.length}件：${list.map(o=>fmt(o.shipDate||o.due)).join('、')}${noPrice?'　<span style="color:var(--danger)">単価未入力あり</span>':''}</span></div><div class="amt">${yen(total)}</div><button class="next" style="--c:var(--s4)" data-inv="${esc(k)}" ${noPrice?'disabled':''}>作成</button></div>`;
+  }).join('') : '<div class="empty">「発送済」で未請求の注文はありません</div>';
+  $('invList').querySelectorAll('[data-inv]').forEach(b=>b.onclick=async()=>{ b.disabled=true; b.textContent='作成中…'; const r=await makeInvoiceFor(groups[b.dataset.inv]); renderInv(); if(r&&r.url) window.open(r.url,'_blank'); });
+}
+
 // ===== 起動 =====
-render(); pull();
+render(); pull(); loadMaster();
 setInterval(pull, 60*1000);
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) pull(); });
 </script>
