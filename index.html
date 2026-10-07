@@ -216,7 +216,7 @@ a{color:var(--kuri-2)}
     <div class="bar"><h2>請求書をまとめて作る</h2><button class="x" data-close="inv">×</button></div>
     <div class="body">
       <div class="f"><label>対象月（発送日で絞り込み）</label><div style="display:flex;gap:8px;align-items:center"><input type="month" id="invMonth" style="flex:1"><label style="display:flex;align-items:center;gap:4px;font-size:13.5px;white-space:nowrap"><input type="checkbox" id="invAll">全期間</label></div></div>
-      <div class="f"><div style="font-size:13.5px;color:var(--sub)">選んだ月に発送した「発送済」で未請求の注文を、注文元ごとにまとめて1枚の請求書にします。作成後は「請求済」になります。</div></div>
+      <div class="f"><div style="font-size:13.5px;color:var(--sub)">選んだ月に発送した「発送済」で未請求の注文を、注文元ごとにまとめて1枚の請求書にします（発送日・納期が未入力の注文はどの月でも表示）。作成後は「請求済」になります。</div></div>
       <div id="invList"></div>
     </div>
   </div>
@@ -558,13 +558,13 @@ $('openInv').onclick=()=>{ if(!$('invMonth').value){ const d=new Date(); $('invM
 $('invMonth').addEventListener('change',renderInv); $('invAll').addEventListener('change',renderInv);
 function renderInv(){
   const ym=$('invMonth').value, all=$('invAll').checked;
-  const targets=visible().filter(o=>o.status==='発送済' && !o.invoiceUrl && (all || !ym || String(o.shipDate||o.due||'').slice(0,7)===ym));
+  const targets=visible().filter(o=>o.status==='発送済' && !o.invoiceUrl && (all || !ym || !(o.shipDate||o.due) || String(o.shipDate||o.due).slice(0,7)===ym));
   const groups={}; targets.forEach(o=>{ (groups[o.customer]=groups[o.customer]||[]).push(o); });
   const keys=Object.keys(groups).sort();
   $('invList').innerHTML = keys.length ? keys.map(k=>{
     const list=groups[k]; const total=list.reduce((a,o)=>a+calcItems(o.items).total,0);
     const noPrice=list.some(o=>!calcItems(o.items).sub);
-    return `<div class="inv-row"><div class="n"><b>${esc(k)}</b><span>${list.length}件：${list.map(o=>fmt(o.shipDate||o.due)).join('、')}${noPrice?'　<span style="color:var(--danger)">単価未入力あり</span>':''}</span></div><div class="amt">${yen(total)}</div><button class="next" style="--c:var(--s4)" data-inv="${esc(k)}" ${noPrice?'disabled':''}>作成</button></div>`;
+    return `<div class="inv-row"><div class="n"><b>${esc(k)}</b><span>${list.length}件：${list.map(o=>(o.shipDate||o.due)?fmt(o.shipDate||o.due):'<span style="color:var(--danger)">日付なし</span>').join('、')}${noPrice?'　<span style="color:var(--danger)">単価未入力あり</span>':''}</span></div><div class="amt">${yen(total)}</div><button class="next" style="--c:var(--s4)" data-inv="${esc(k)}" ${noPrice?'disabled':''}>作成</button></div>`;
   }).join('') : `<div class="empty">${all?'':(ym?ym.replace('-','年')+'月に発送した':'')}「発送済」で未請求の注文はありません</div>`;
   $('invList').querySelectorAll('[data-inv]').forEach(b=>b.onclick=async()=>{ b.disabled=true; b.textContent='作成中…'; const r=await makeInvoiceFor(groups[b.dataset.inv]); renderInv(); if(r&&r.url) window.open(r.url,'_blank'); });
 }
