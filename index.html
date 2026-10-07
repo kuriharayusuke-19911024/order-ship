@@ -90,6 +90,9 @@ a{color:var(--kuri-2)}
 .inv-row .n b{display:block;font-size:15px}
 .inv-row .n span{font-size:12.5px;color:var(--sub)}
 .inv-row .amt{font-weight:700;white-space:nowrap}
+.shiprow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.shiprow select{width:auto;flex:1;min-width:90px}
+.shipout{font-size:13px;color:var(--sub);flex-basis:100%}
 .irow input{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 8px;background:#fff}
 .irow button{border:0;background:none;color:var(--sub);font-size:20px}
 .add{border:1px dashed var(--kuri-2);color:var(--kuri-2);background:none;border-radius:8px;padding:7px 12px;font-size:13.5px;width:100%}
@@ -163,6 +166,14 @@ a{color:var(--kuri-2)}
       </div>
       <div class="f"><label>発送先（名前）</label><input id="fShipTo" placeholder="注文元と同じなら空欄でOK"></div>
       <div class="f"><label>発送先住所・電話</label><textarea id="fAddr" placeholder="住所、電話番号、時間指定など"></textarea></div>
+      <div class="f"><label>送料（住所から都道府県を判定して自動計算・税抜＋加算）</label>
+        <div class="shiprow">
+          <select id="fShipType"><option value="">送料なし</option><option value="常温">常温</option><option value="冷蔵">クール冷蔵</option><option value="冷凍">クール冷凍</option></select>
+          <select id="fSize"></select>
+          <select id="fPref"></select>
+          <span class="shipout" id="shipOut"></span>
+        </div>
+      </div>
       <div class="f2">
         <div class="f"><label>発送の担当者</label><select id="fAssignee"></select></div>
         <div class="f"><label>ステータス</label><select id="fStatus"></select></div>
@@ -225,7 +236,21 @@ let orders = JSON.parse(localStorage.getItem('orders')||'[]');
 let pending = JSON.parse(localStorage.getItem('pending')||'[]');
 let me = localStorage.getItem('me')||'';
 let filter = 'all', pendingFile = null;
-let master = JSON.parse(localStorage.getItem('master')||'{"settings":{},"products":[]}');
+let master = JSON.parse(localStorage.getItem('master')||'{"settings":{},"products":[],"ship":[]}');
+const ZONES = ['南九州','北九州','四国','中国','関西','北陸','東海','信越','関東','南東北','北東北','北海道'];
+const PREF_ZONE = {'熊本':0,'宮崎':0,'鹿児島':0,'福岡':1,'佐賀':1,'長崎':1,'大分':1,'徳島':2,'香川':2,'愛媛':2,'高知':2,'鳥取':3,'島根':3,'岡山':3,'広島':3,'山口':3,'滋賀':4,'京都':4,'大阪':4,'兵庫':4,'奈良':4,'和歌山':4,'富山':5,'石川':5,'福井':5,'岐阜':6,'静岡':6,'愛知':6,'三重':6,'新潟':7,'長野':7,'茨城':8,'栃木':8,'群馬':8,'埼玉':8,'千葉':8,'東京':8,'神奈川':8,'山梨':8,'宮城':9,'山形':9,'福島':9,'青森':10,'岩手':10,'秋田':10,'北海道':11,'沖縄':-1};
+const PREFS = Object.keys(PREF_ZONE);
+function detectPref(text){ const t=String(text||''); let best=null,pos=1e9; PREFS.forEach(p=>{ const i=t.indexOf(p); if(i>=0 && i<pos){ pos=i; best=p; } }); return best; }
+function shipFee(type,size,pref){
+  const ship=master.ship||[]; if(!type||!pref||!(pref in PREF_ZONE)) return null;
+  const z=PREF_ZONE[pref]; if(z<0) return {err:'沖縄は別途料金'};
+  const base=ship.find(r=>r.type===(type==='常温'?'常温':'クール') && r.size===Number(size)); if(!base) return {err:'該当サイズなし'};
+  let fee=base.rates[z]||0; let cool=0;
+  if(type!=='常温'){ const c=ship.filter(r=>r.type==='クール加算').sort((a,b)=>a.kg-b.kg).find(r=>r.kg>=base.kg); cool=c?c.rates[0]:0; }
+  const add=Number((master.settings||{})['送料加算'])||0;
+  return {fee:fee+cool+add, base:fee, cool, add, zone:ZONES[z]};
+}
+function sizesFor(type){ return [...new Set((master.ship||[]).filter(r=>r.type===(type==='常温'?'常温':'クール')).map(r=>r.size))].sort((a,b)=>a-b); }
 const yen = n=>'¥'+Math.round(Number(n)||0).toLocaleString('ja-JP');
 function calcItems(items){
   const byTax={}; let sub=0;
@@ -235,7 +260,7 @@ function calcItems(items){
 }
 async function loadMaster(){
   if(!API_URL) return;
-  try{ const r=await fetch(API_URL+'?action=master&t='+Date.now()); const j=await r.json(); if(j.products){ master=j; localStorage.setItem('master',JSON.stringify(master)); renderProdList(); } }catch(e){ console.error(e); }
+  try{ const r=await fetch(API_URL+'?action=master&t='+Date.now()); const j=await r.json(); if(j.products){ master=j; localStorage.setItem('master',JSON.stringify(master)); renderProdList(); if(!$('form').hidden) fillShipUI(); } }catch(e){ console.error(e); }
 }
 function renderProdList(){
   const names=new Set(master.products.map(p=>p.name));
@@ -244,6 +269,25 @@ function renderProdList(){
 }
 
 const $ = id=>document.getElementById(id);
+function fillShipUI(){
+  const type=$('fShipType').value; const cur=$('fSize').value;
+  const sizes=type?sizesFor(type):[];
+  $('fSize').innerHTML=sizes.map(z=>`<option value="${z}" ${String(z)===cur?'selected':''}>${z}サイズ</option>`).join('')||'<option value="">—</option>';
+  if(!$('fPref').options.length) $('fPref').innerHTML='<option value="">都道府県</option>'+PREFS.map(p=>`<option value="${p}">${p}</option>`).join('');
+  $('fSize').disabled=!type; $('fPref').disabled=!type;
+}
+function upsertShipItem(){
+  const type=$('fShipType').value, size=$('fSize').value, pref=$('fPref').value;
+  const rows=[...$('items').children]; const shipRow=rows.find(r=>r.querySelector('input').value.trim()==='送料');
+  if(!type){ $('shipOut').textContent=''; return; }
+  const r=shipFee(type,size,pref);
+  if(!r||r.err){ $('shipOut').textContent=r?r.err:'都道府県を選んでください'; return; }
+  $('shipOut').textContent=`${r.zone}：運賃 ${yen(r.base)}${r.cool?` ＋クール ${yen(r.cool)}`:''} ＋加算 ${yen(r.add)} ＝ 送料 ${yen(r.fee)}（税抜・10%）`;
+  const it={name:'送料',qty:1,unit:'式',price:r.fee,tax:10};
+  if(shipRow){ const [n,q,u,p]=shipRow.querySelectorAll('input'); q.value=1; u.value='式'; p.value=r.fee; shipRow.querySelector('select').value='10'; }
+  else { const empty=rows.find(x=>!x.querySelector('input').value.trim()); const el=itemRow(it); if(empty) $('items').replaceChild(el,empty); else $('items').appendChild(el); }
+  updSub();
+}
 const esc = s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const today = ()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
 const fmt = s=>s? s.replace(/^(\d{4})-(\d{2})-(\d{2}).*/,(m,y,mo,d)=>`${+mo}/${+d}`):'—';
@@ -374,6 +418,9 @@ function itemRow(it={}){
 function readItems(){ return [...$('items').children].map(r=>{const [n,q,u,p]=r.querySelectorAll('input'); const t=r.querySelector('select'); return {name:n.value.trim(),qty:q.value,unit:u.value.trim(),price:p.value,tax:Number(t.value)};}).filter(i=>i.name); }
 function updSub(){ const c=calcItems(readItems()); $('subtot').innerHTML = c.sub ? `税抜 ${yen(c.sub)}　消費税 ${yen(c.tax)}　<b>合計 ${yen(c.total)}</b>` : ''; }
 $('addItem').onclick=()=>{ $('items').appendChild(itemRow()); };
+$('fShipType').onchange=()=>{ fillShipUI(); upsertShipItem(); };
+$('fSize').onchange=upsertShipItem; $('fPref').onchange=upsertShipItem;
+$('fAddr').addEventListener('input',()=>{ const p=detectPref($('fAddr').value); if(p && $('fPref').value!==p){ $('fPref').value=p; upsertShipItem(); } });
 $('fAssignee').innerHTML='<option value="">未定</option>'+MEMBERS.map(m=>`<option>${m}</option>`).join('');
 $('fStatus').innerHTML=STATUS.map(s=>`<option>${s}</option>`).join('');
 function openForm(o){
@@ -384,6 +431,9 @@ function openForm(o){
   $('fAssignee').value=o?.assignee||''; $('fStatus').value=o?.status||'受注'; $('fMemo').value=o?.memo||'';
   $('items').innerHTML=''; ((o?.items?.length?o.items:[{}])).forEach(it=>$('items').appendChild(itemRow(it))); updSub();
   $('fShipDate').value=o?.shipDate||''; $('fShowPrice').checked=o?.showPrice!==false;
+  $('fShipType').value=o?.shipType||''; fillShipUI(); if(o?.size) $('fSize').value=String(o.size);
+  $('fPref').value=o?.pref||detectPref(o?.addr)||''; $('shipOut').textContent='';
+  if(o?.shipType){ const r=shipFee(o.shipType,$('fSize').value,$('fPref').value); if(r&&!r.err) $('shipOut').textContent=`${r.zone}：送料 ${yen(r.fee)}（税抜）`; }
   if(o?.fileName){ $('fileName').textContent='登録済み：'+o.fileName; }
   if(o?.fileUrl && o.fileType?.startsWith('image')){ $('fThumb').src=o.fileUrl; $('fThumb').hidden=false; }
   $('form').hidden=false; $('form').querySelector('.inner').scrollTop=0;
@@ -414,6 +464,7 @@ async function onFile(e){
 function applyRead(d){
   const set=(id,v)=>{ if(v && !$(id).value) $(id).value=v; };
   set('fDate',d.orderDate); set('fDue',d.due); set('fCust',d.customer); set('fShipTo',d.shipTo); set('fAddr',d.addr); set('fMemo',d.memo);
+  const pf=detectPref($('fAddr').value); if(pf){ $('fPref').value=pf; upsertShipItem(); }
   const cur=[...$('items').children].some(r=>r.querySelector('input').value.trim());
   if(!cur && Array.isArray(d.items) && d.items.length){ $('items').innerHTML=''; d.items.forEach(it=>{ const m=master.products.find(x=>x.name===String(it.name||'').trim()); if(m){ it.price=it.price||m.price; it.unit=it.unit||m.unit; it.tax=m.tax; } $('items').appendChild(itemRow(it)); }); updSub(); }
 }
@@ -443,7 +494,8 @@ $('save').onclick=async()=>{
   const o = Object.assign({}, old||{id:uid(),createdAt:now(),createdBy:me,history:[]}, {
     orderDate:$('fDate').value, due:$('fDue').value, customer:cust, items, shipTo:$('fShipTo').value.trim(), addr:$('fAddr').value.trim(),
     assignee:$('fAssignee').value, status:$('fStatus').value, memo:$('fMemo').value.trim(),
-    shipDate:$('fShipDate').value, showPrice:$('fShowPrice').checked
+    shipDate:$('fShipDate').value, showPrice:$('fShowPrice').checked,
+    shipType:$('fShipType').value, size:$('fSize').value, pref:$('fPref').value
   });
   if(!old) o.history.push({at:now(),by:me||'（名前未設定）',to:o.status+'（登録）'});
   else if(old.status!==o.status) o.history.push({at:now(),by:me||'（名前未設定）',to:o.status});
