@@ -395,7 +395,7 @@ async function makeInvoiceFor(list){
   try{
     const r=await api({action:'invoice',orders:list});
     list.forEach(o=>{ o.invoiceUrl=r.url; o.invoiceNo=r.no; if(STATUS.indexOf(o.status)<3){ o.status='請求済'; (o.history=o.history||[]).push({at:now(),by:me||'（名前未設定）',to:'請求済'}); } saveOrder(o); });
-    toast(`請求書 ${r.no} を作成（${yen(r.total)}）`);
+    const d=r.draft||{}; toast(`請求書 ${r.no} を作成（${yen(r.total)}）`+(d.ok?`　メール下書きを作成（${d.to}）`:d.error?`　※メール下書き失敗：${d.error}`:''));
     return r;
   }catch(err){ console.error(err); toast('請求書を作成できませんでした：'+err.message); }
 }
