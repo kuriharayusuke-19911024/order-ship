@@ -122,6 +122,11 @@ a{color:var(--kuri-2)}
 
 .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;z-index:30;box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:90vw}
 .notice{margin:8px 14px 0;background:#fff6dd;border:1px solid #ecd48c;border-radius:10px;padding:8px 12px;font-size:13px}
+.monthly{margin:10px 12px 0;background:#fff;border:1px solid var(--line,#e5e0d6);border-radius:12px;padding:10px 12px}
+.monthly .mrow{display:flex;align-items:center;gap:8px}.monthly .mrow b{font-size:15px}.monthly .msub{margin-left:auto;font-size:12px;color:var(--sub)}
+.mnav{border:1px solid var(--line,#e5e0d6);background:#fff;border-radius:8px;width:30px;height:30px;font-size:18px;cursor:pointer}
+.mstats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.mstats div{background:#f7f4ee;border-radius:8px;padding:6px 8px}.mstats small{display:block;font-size:11px;color:var(--sub)}.mstats b{font-size:16px}
+.mby{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:12px;color:var(--sub)}.mby span{background:#f7f4ee;border-radius:999px;padding:3px 9px}
 </style>
 </head>
 <body>
@@ -136,6 +141,11 @@ a{color:var(--kuri-2)}
 
 <div class="notice" id="noapi" hidden>API_URLが未設定のため、この端末だけに保存されています。共有するにはGASのURLを設定してください。</div>
 
+<div class="monthly" id="monthly">
+  <div class="mrow"><button class="mnav" id="mPrev">‹</button><b id="mLabel"></b><button class="mnav" id="mNext">›</button><span class="msub">注文日で集計</span></div>
+  <div class="mstats"><div><small>件数</small><b id="mCount">0</b></div><div><small>税込合計</small><b id="mTotal">¥0</b></div><div><small>税抜</small><b id="mSub">¥0</b></div><div><small>未入金</small><b id="mUnpaid">¥0</b></div></div>
+  <div class="mby" id="mBy"></div>
+</div>
 <div class="chips" id="chips"></div>
 <div class="tools">
   <input id="q" type="search" placeholder="注文元・商品・発送先で検索">
@@ -168,7 +178,7 @@ a{color:var(--kuri-2)}
       <div class="f"><label>発送先住所・電話</label><textarea id="fAddr" placeholder="住所、電話番号、時間指定など"></textarea></div>
       <div class="f"><label>送料（住所から都道府県を判定して自動計算・税抜＋加算）</label>
         <div class="shiprow">
-          <select id="fShipType"><option value="">送料なし</option><option value="常温">常温</option><option value="冷蔵">クール冷蔵</option><option value="冷凍">クール冷凍</option></select>
+          <select id="fShipType"><option value="">送料を選択…</option><option value="none">送料なし（引取など）</option><option value="常温">常温</option><option value="冷蔵">クール冷蔵</option><option value="冷凍">クール冷凍</option></select>
           <select id="fSize"></select>
           <select id="fPref"></select>
           <span class="shipout" id="shipOut"></span>
@@ -270,17 +280,18 @@ function renderProdList(){
 }
 
 const $ = id=>document.getElementById(id);
+const shipTypeVal=()=>{ const v=$('fShipType').value; return v==='none'?'':v; };
 function fillShipUI(){
-  const type=$('fShipType').value; const cur=$('fSize').value;
+  const type=shipTypeVal(); const cur=$('fSize').value;
   const sizes=type?sizesFor(type):[];
   $('fSize').innerHTML=sizes.map(z=>`<option value="${z}" ${String(z)===cur?'selected':''}>${z}サイズ</option>`).join('')||'<option value="">—</option>';
   if(!$('fPref').options.length) $('fPref').innerHTML='<option value="">都道府県</option>'+PREFS.map(p=>`<option value="${p}">${p}</option>`).join('');
   $('fSize').disabled=!type; $('fPref').disabled=!type;
 }
 function upsertShipItem(){
-  const type=$('fShipType').value, size=$('fSize').value, pref=$('fPref').value;
+  const type=shipTypeVal(), size=$('fSize').value, pref=$('fPref').value;
   const rows=[...$('items').children]; const shipRow=rows.find(r=>r.querySelector('input').value.trim()==='送料');
-  if(!type){ $('shipOut').textContent=''; return; }
+  if(!type){ $('shipOut').textContent=''; if(shipRow && $('fShipType').value==='none'){ shipRow.remove(); updSub(); } return; }
   const r=shipFee(type,size,pref);
   if(!r||r.err){ $('shipOut').textContent=r?r.err:'都道府県を選んでください'; return; }
   $('shipOut').textContent=`${r.zone}：運賃 ${yen(r.base)}${r.cool?` ＋クール ${yen(r.cool)}`:''} ＋加算 ${yen(r.add)} ＝ 送料 ${yen(r.fee)}（税抜・10%）`;
@@ -336,7 +347,18 @@ function saveOrder(o){
 
 // ===== 一覧 =====
 function visible(){ return orders.filter(o=>!o.deleted); }
+let mCur=(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');})();
+function shiftMonth(n){ const [y,m]=mCur.split('-').map(Number); const d=new Date(y,m-1+n,1); mCur=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); renderMonthly(); }
+function renderMonthly(){
+  const list=visible().filter(o=>String(o.orderDate||o.createdAt||'').slice(0,7)===mCur);
+  let sub=0,total=0,unpaid=0; const by={};
+  list.forEach(o=>{ const c=calcItems(o.items); sub+=c.sub; total+=c.total; if(o.status!=='入金済') unpaid+=c.total; by[o.status]=(by[o.status]||0)+1; });
+  const [y,m]=mCur.split('-'); $('mLabel').textContent=`${y}年${+m}月`;
+  $('mCount').textContent=list.length+'件'; $('mTotal').textContent=yen(total); $('mSub').textContent=yen(sub); $('mUnpaid').textContent=yen(unpaid);
+  $('mBy').innerHTML=STATUS.filter(s=>by[s]).map(s=>`<span>${s} ${by[s]}</span>`).join('')||'<span>注文なし</span>';
+}
 function render(){
+  renderMonthly();
   const vis = visible();
   const counts = {all:vis.length, mine:vis.filter(o=>o.assignee===me && o.status!=='入金済').length};
   STATUS.forEach(s=>counts[s]=vis.filter(o=>o.status===s).length);
@@ -432,7 +454,7 @@ function openForm(o){
   $('fAssignee').value=o?.assignee||''; $('fStatus').value=o?.status||'受注'; $('fMemo').value=o?.memo||'';
   $('items').innerHTML=''; ((o?.items?.length?o.items:[{}])).forEach(it=>$('items').appendChild(itemRow(it))); updSub();
   $('fShipDate').value=o?.shipDate||''; $('fShowPrice').checked=o?.showPrice!==false;
-  $('fShipType').value=o?.shipType||''; fillShipUI(); if(o?.size) $('fSize').value=String(o.size);
+  $('fShipType').value=o?.shipType||(o?'none':''); fillShipUI(); if(o?.size) $('fSize').value=String(o.size);
   $('fPref').value=o?.pref||detectPref(o?.addr)||''; $('shipOut').textContent='';
   if(o?.shipType){ const r=shipFee(o.shipType,$('fSize').value,$('fPref').value); if(r&&!r.err) $('shipOut').textContent=`${r.zone}：送料 ${yen(r.fee)}（税抜）`; }
   if(o?.fileName){ $('fileName').textContent='登録済み：'+o.fileName; }
@@ -491,6 +513,13 @@ $('save').onclick=async()=>{
   const cust=$('fCust').value.trim(); if(!cust){ toast('注文元を入力してください'); $('fCust').focus(); return; }
   const items=readItems();
   if(!items.length){ toast('商品を1つ以上入力してください'); return; }
+  const bad=items.find(i=>i.name!=='送料' && (!(Number(i.qty)>0) || !(Number(i.price)>0)));
+  if(bad){ toast(`「${bad.name}」の数量・単価を入力してください（保存には金額が必要です）`); return; }
+  if(!$('fShipType').value){ toast('送料（便種）を選んでください。送料がかからない場合は「送料なし」を選択'); $('fShipType').focus(); return; }
+  if($('fShipType').value!=='none'){
+    const ship=items.find(i=>i.name==='送料');
+    if(!ship || !(Number(ship.price)>0)){ toast('送料が計算できていません。サイズと都道府県を選んでください'); $('fSize').focus(); return; }
+  }
   const id=$('fId').value; const old=orders.find(x=>x.id===id);
   const o = Object.assign({}, old||{id:uid(),createdAt:now(),createdBy:me,history:[]}, {
     orderDate:$('fDate').value, due:$('fDue').value, customer:cust, items, shipTo:$('fShipTo').value.trim(), addr:$('fAddr').value.trim(),
@@ -554,6 +583,7 @@ function openDetail(id){
 }
 
 // ===== 月末請求 =====
+$('mPrev').onclick=()=>shiftMonth(-1); $('mNext').onclick=()=>shiftMonth(1);
 $('openInv').onclick=()=>{ if(!$('invMonth').value){ const d=new Date(); $('invMonth').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); } renderInv(); $('inv').hidden=false; };
 $('invMonth').addEventListener('change',renderInv); $('invAll').addEventListener('change',renderInv);
 function renderInv(){
