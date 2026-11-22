@@ -174,11 +174,15 @@ a{color:var(--kuri-2)}
         <button class="add" id="addItem">＋ 商品を追加</button>
         <datalist id="prodList"></datalist>
       </div>
+      <div class="f2">
+        <div class="f"><label>発注No（注文書の番号）</label><input id="fOrderNo" placeholder="例：00620361"><input type="hidden" id="fShipCode"></div>
+        <div class="f"><label>先方の担当者</label><input id="fContact" placeholder="例：川島大河"></div>
+      </div>
       <div class="f"><label>発送先（名前）</label><input id="fShipTo" placeholder="注文元と同じなら空欄でOK"></div>
       <div class="f"><label>発送先住所・電話</label><textarea id="fAddr" placeholder="住所、電話番号、時間指定など"></textarea></div>
       <div class="f"><label>送料（住所から都道府県を判定して自動計算・税抜＋加算）</label>
         <div class="shiprow">
-          <select id="fShipType"><option value="">送料を選択…</option><option value="none">送料なし（引取など）</option><option value="常温">常温</option><option value="冷蔵">クール冷蔵</option><option value="冷凍">クール冷凍</option></select>
+          <select id="fShipType"><option value="">送料を選択…</option><option value="none">送料なし（引取など）</option><option value="常温">常温</option><option value="冷蔵">クール冷蔵</option><option value="冷凍">クール冷凍</option><option value="negi">岩津ねぎ（森下さん発送）</option></select>
           <select id="fSize"></select>
           <select id="fPref"></select>
           <span class="shipout" id="shipOut"></span>
@@ -192,6 +196,11 @@ a{color:var(--kuri-2)}
         <div class="f"><label>発送日（納品書の日付）</label><input type="date" id="fShipDate"></div>
         <div class="f"><label>納品書</label><label class="chk" style="margin-top:8px"><input type="checkbox" id="fShowPrice" checked> 金額を載せる</label></div>
       </div>
+      <div class="f2">
+        <div class="f"><label>伝票番号（問合せNo）</label><input id="fTracking" placeholder="例：4403-8942-1920"></div>
+        <div class="f"><label>店着日</label><input type="date" id="fArrival"></div>
+      </div>
+      <div class="f"><label>配送時間指定</label><select id="fTimeSlot"><option value="">指定なし</option></select></div>
       <div class="f"><label>メモ・伝えたいこと</label><textarea id="fMemo" placeholder="例：熨斗あり／クール便で"></textarea></div>
       <div class="f"><label>メールで来た注文はここに本文を貼る</label>
         <textarea id="fMail" placeholder="注文メールの本文をコピーして貼り付け → 「読み取る」" style="min-height:60px"></textarea>
@@ -237,7 +246,9 @@ a{color:var(--kuri-2)}
 <script>
 // ===== 設定 =====
 const API_URL = 'https://script.google.com/macros/s/AKfycbygQB1AB_PSgpIQM1Kzf_hxN8vwmDmEbMqwM_GGr8GuQCfUEFqDhenZLnGC2JuMDg5V/exec'; // ← GASのウェブアプリURLを貼る（空ならこの端末だけに保存）
-const MEMBERS = ['栗原直人','栗原優介','秋山龍之輔','栗原亜美','木村みき','栗原美智代','松本琉雅'];
+const MEMBERS = ['栗原直人','栗原優介','秋山龍之輔','栗原亜美','木村みき','栗原美智代','松本琉雅','森下'];
+const NEGI_FEE = {kansai:1000, other:1500}; // 岩津ねぎ（森下さん発送）の概算送料
+const TIME_SLOTS = ['午前中','12-14時','14-16時','16-18時','18-20時','19-21時'];
 const STATUS = ['受注','発送依頼','発送済','請求済','入金済'];
 const SCOLOR = ['var(--s1)','var(--s2)','var(--s3)','var(--s4)','var(--s5)'];
 const STEP_LABEL = ['発送を依頼する','発送した','請求した','入金を確認した'];
@@ -254,6 +265,7 @@ const PREFS = Object.keys(PREF_ZONE);
 function detectPref(text){ const t=String(text||''); let best=null,pos=1e9; PREFS.forEach(p=>{ const i=t.indexOf(p); if(i>=0 && i<pos){ pos=i; best=p; } }); return best; }
 function shipFee(type,size,pref){
   const ship=master.ship||[]; if(!type||!pref||!(pref in PREF_ZONE)) return null;
+  if(type==='negi'){ const z=PREF_ZONE[pref]; const fee=z===4?NEGI_FEE.kansai:NEGI_FEE.other; return {fee, base:fee, cool:0, add:0, zone:ZONES[z]||pref, negi:true}; }
   const z=PREF_ZONE[pref]; if(z<0) return {err:'沖縄は別途料金'};
   const base=ship.find(r=>r.type===(type==='常温'?'常温':'クール') && r.size===Number(size)); if(!base) return {err:'該当サイズなし'};
   let fee=base.rates[z]||0; let cool=0;
@@ -261,7 +273,7 @@ function shipFee(type,size,pref){
   const add=Number((master.settings||{})['送料加算'])||0;
   return {fee:fee+cool+add, base:fee, cool, add, zone:ZONES[z]};
 }
-function sizesFor(type){ return [...new Set((master.ship||[]).filter(r=>r.type===(type==='常温'?'常温':'クール')).map(r=>r.size))].sort((a,b)=>a-b); }
+function sizesFor(type){ if(type==='negi') return []; return [...new Set((master.ship||[]).filter(r=>r.type===(type==='常温'?'常温':'クール')).map(r=>r.size))].sort((a,b)=>a-b); }
 const yen = n=>'¥'+Math.round(Number(n)||0).toLocaleString('ja-JP');
 function calcItems(items){
   const byTax={}; let sub=0;
@@ -286,7 +298,8 @@ function fillShipUI(){
   const sizes=type?sizesFor(type):[];
   $('fSize').innerHTML=sizes.map(z=>`<option value="${z}" ${String(z)===cur?'selected':''}>${z}サイズ</option>`).join('')||'<option value="">—</option>';
   if(!$('fPref').options.length) $('fPref').innerHTML='<option value="">都道府県</option>'+PREFS.map(p=>`<option value="${p}">${p}</option>`).join('');
-  $('fSize').disabled=!type; $('fPref').disabled=!type;
+  $('fSize').disabled=!type||type==='negi'; $('fPref').disabled=!type;
+  if(type==='negi' && !$('fAssignee').value) $('fAssignee').value='森下';
 }
 function upsertShipItem(){
   const type=shipTypeVal(), size=$('fSize').value, pref=$('fPref').value;
@@ -294,7 +307,7 @@ function upsertShipItem(){
   if(!type){ $('shipOut').textContent=''; if(shipRow && $('fShipType').value==='none'){ shipRow.remove(); updSub(); } return; }
   const r=shipFee(type,size,pref);
   if(!r||r.err){ $('shipOut').textContent=r?r.err:'都道府県を選んでください'; return; }
-  $('shipOut').textContent=`${r.zone}：運賃 ${yen(r.base)}${r.cool?` ＋クール ${yen(r.cool)}`:''} ＋加算 ${yen(r.add)} ＝ 送料 ${yen(r.fee)}（税抜・10%）`;
+  $('shipOut').textContent=r.negi?`${r.zone}：岩津ねぎ送料 ${yen(r.fee)}（概算・税抜10%）`:`${r.zone}：運賃 ${yen(r.base)}${r.cool?` ＋クール ${yen(r.cool)}`:''} ＋加算 ${yen(r.add)} ＝ 送料 ${yen(r.fee)}（税抜・10%）`;
   const it={name:'送料',qty:1,unit:'式',price:r.fee,tax:10};
   if(shipRow){ const [n,q,u,p]=shipRow.querySelectorAll('input'); q.value=1; u.value='式'; p.value=r.fee; shipRow.querySelector('select').value='10'; }
   else { const empty=rows.find(x=>!x.querySelector('input').value.trim()); const el=itemRow(it); if(empty) $('items').replaceChild(el,empty); else $('items').appendChild(el); }
@@ -399,6 +412,7 @@ function advance(id,dir){
   const o=orders.find(x=>x.id===id); const i=STATUS.indexOf(o.status)+dir; if(i<0||i>=STATUS.length) return;
   o.status=STATUS[i]; (o.history=o.history||[]).push({at:now(),by:me,to:o.status});
   if(dir>0 && o.status==='発送済' && !o.shipDate) o.shipDate=today();
+  if(dir>0 && o.status==='発送済' && !o.tracking){ const t=window.prompt('伝票番号（問合せNo）があれば入力してください（なければ空欄でOK）',''); if(t && t.trim()) o.tracking=t.trim(); }
   saveOrder(o); toast(`「${o.status}」にしました`);
   if(dir>0 && o.status==='発送依頼'){ notifyLine(o); makeDelivery(o); }
   if(!$('detail').hidden) openDetail(id);
@@ -454,6 +468,8 @@ function openForm(o){
   $('fAssignee').value=o?.assignee||''; $('fStatus').value=o?.status||'受注'; $('fMemo').value=o?.memo||'';
   $('items').innerHTML=''; ((o?.items?.length?o.items:[{}])).forEach(it=>$('items').appendChild(itemRow(it))); updSub();
   $('fShipDate').value=o?.shipDate||''; $('fShowPrice').checked=o?.showPrice!==false;
+  $('fOrderNo').value=o?.orderNo||''; $('fShipCode').value=o?.shipCode||''; $('fContact').value=o?.contact||''; $('fTracking').value=o?.tracking||''; $('fArrival').value=o?.arrival||'';
+  if($('fTimeSlot').options.length<2) $('fTimeSlot').innerHTML='<option value="">指定なし</option>'+TIME_SLOTS.map(t=>`<option>${t}</option>`).join(''); $('fTimeSlot').value=o?.timeSlot||'';
   $('fShipType').value=o?.shipType||(o?'none':''); fillShipUI(); if(o?.size) $('fSize').value=String(o.size);
   $('fPref').value=o?.pref||detectPref(o?.addr)||''; $('shipOut').textContent='';
   if(o?.shipType){ const r=shipFee(o.shipType,$('fSize').value,$('fPref').value); if(r&&!r.err) $('shipOut').textContent=`${r.zone}：送料 ${yen(r.fee)}（税抜）`; }
@@ -486,7 +502,9 @@ async function onFile(e){
 }
 function applyRead(d){
   const set=(id,v)=>{ if(v && !$(id).value) $(id).value=v; };
-  set('fDate',d.orderDate); set('fDue',d.due); set('fCust',d.customer); set('fShipTo',d.shipTo); set('fAddr',d.addr); set('fMemo',d.memo);
+  set('fDate',d.orderDate); set('fDue',d.due); set('fCust',d.customer); set('fShipTo',d.shipTo); set('fAddr',d.addr); set('fMemo',d.memo); set('fOrderNo',d.orderNo); set('fContact',d.contact); set('fShipCode',d.shipCode);
+  if(d.timeSlot){ const t=TIME_SLOTS.find(x=>String(d.timeSlot).replace(/[〜～]/,'-').includes(x.replace('時',''))); if(t && !$('fTimeSlot').value) $('fTimeSlot').value=t; }
+  if(Array.isArray(d.items) && d.items.some(it=>/ねぎ|ネギ|葱/.test(String(it.name||''))) && !$('fShipType').value){ $('fShipType').value='negi'; fillShipUI(); }
   const pf=detectPref($('fAddr').value); if(pf){ $('fPref').value=pf; upsertShipItem(); }
   const cur=[...$('items').children].some(r=>r.querySelector('input').value.trim());
   if(!cur && Array.isArray(d.items) && d.items.length){ $('items').innerHTML=''; d.items.forEach(it=>{ const m=master.products.find(x=>x.name===String(it.name||'').trim()); if(m){ it.price=it.price||m.price; it.unit=it.unit||m.unit; it.tax=m.tax; } $('items').appendChild(itemRow(it)); }); updSub(); }
@@ -518,15 +536,17 @@ $('save').onclick=async()=>{
   if(!$('fShipType').value){ toast('送料（便種）を選んでください。送料がかからない場合は「送料なし」を選択'); $('fShipType').focus(); return; }
   if($('fShipType').value!=='none'){
     const ship=items.find(i=>i.name==='送料');
-    if(!ship || !(Number(ship.price)>0)){ toast('送料が計算できていません。サイズと都道府県を選んでください'); $('fSize').focus(); return; }
+    if(!ship || !(Number(ship.price)>0)){ toast('送料が計算できていません。'+($('fShipType').value==='negi'?'都道府県':'サイズと都道府県')+'を選んでください'); $('fPref').focus(); return; }
   }
   const id=$('fId').value; const old=orders.find(x=>x.id===id);
   const o = Object.assign({}, old||{id:uid(),createdAt:now(),createdBy:me,history:[]}, {
     orderDate:$('fDate').value, due:$('fDue').value, customer:cust, items, shipTo:$('fShipTo').value.trim(), addr:$('fAddr').value.trim(),
     assignee:$('fAssignee').value, status:$('fStatus').value, memo:$('fMemo').value.trim(),
     shipDate:$('fShipDate').value, showPrice:$('fShowPrice').checked,
+    orderNo:$('fOrderNo').value.trim(), shipCode:$('fShipCode').value.trim(), contact:$('fContact').value.trim(), tracking:$('fTracking').value.trim(), arrival:$('fArrival').value, timeSlot:$('fTimeSlot').value,
     shipType:$('fShipType').value, size:$('fSize').value, pref:$('fPref').value
   });
+  if(!o.assignee && (o.shipType==='negi' || items.some(it=>/ねぎ|ネギ|葱/.test(it.name)))) o.assignee='森下';
   if(!old) o.history.push({at:now(),by:me||'（名前未設定）',to:o.status+'（登録）'});
   else if(old.status!==o.status) o.history.push({at:now(),by:me||'（名前未設定）',to:o.status});
   $('save').disabled=true; $('save').textContent='保存中…';
@@ -543,6 +563,77 @@ $('save').onclick=async()=>{
 };
 
 // ===== 詳細 =====
+
+// ===== 注文書への返信画像（商品・単価・送料・宅急便情報を記入した注文書）=====
+function replyImage(o){
+  const W=1000, pad=50; const cv=document.createElement('canvas'); cv.width=W; cv.height=1414; const g=cv.getContext('2d');
+  const S=master.settings||{};
+  const items=(o.items||[]).filter(i=>i.name); const goods=items.filter(i=>i.name!=='送料'); const ship=items.find(i=>i.name==='送料');
+  const byTax={}; let sub=0; items.forEach(i=>{ const a=(Number(i.qty)||0)*(Number(i.price)||0); const t=(i.tax===''||i.tax==null)?8:Number(i.tax); sub+=a; byTax[t]=(byTax[t]||0)+a; });
+  const taxes=Object.keys(byTax).map(Number).sort((a,b)=>a-b).map(t=>({rate:+t, base:byTax[t], tax:Math.floor(byTax[t]*(+t)/100)})); const taxSum=taxes.reduce((a,x)=>a+x.tax,0);
+  const F='"Noto Sans JP","Hiragino Sans","Yu Gothic","Meiryo",sans-serif';
+  const txt=(t,x,y,sz=20,opt={})=>{ g.font=(opt.b?'700 ':'400 ')+sz+'px '+F; g.fillStyle=opt.c||'#222'; g.textAlign=opt.a||'left'; g.fillText(String(t??''),x,y); };
+  const line=(x1,y1,x2,y2,w=1)=>{ g.strokeStyle='#333'; g.lineWidth=w; g.beginPath(); g.moveTo(x1,y1); g.lineTo(x2,y2); g.stroke(); };
+  g.fillStyle='#fff'; g.fillRect(0,0,W,cv.height);
+  // ヘッダ
+  txt('注文書（記入返信）',W/2,80,30,{b:1,a:'center'});
+  txt('株式会社丹波農商　御中',pad,135,22);
+  txt('発注日　'+(o.orderDate||''),W-pad,100,17,{a:'right'});
+  if(o.orderNo) txt('発注No.　'+o.orderNo,W-pad,126,17,{a:'right'});
+  txt(o.customer||'',W-pad,160,20,{a:'right',b:1});
+  if(o.contact) txt('担当者：'+o.contact,W-pad,188,17,{a:'right'});
+  txt('TEL '+(S['電話']||'')+'　FAX '+(S['FAX']||''),pad,165,15,{c:'#555'});
+  txt('下記のとおり記入のうえ返信いたします。',pad,215,17);
+  txt('納期：'+(o.due?fmtJ(o.due):'')+(o.timeSlot?'　'+o.timeSlot+'納品希望':''),pad,250,20,{b:1});
+  // 明細表
+  const cols=[pad,pad+420,pad+500,pad+580,pad+690,pad+810,W-pad]; const top=285, rh=40;
+  g.fillStyle='#f2ede4'; g.fillRect(pad,top,W-2*pad,rh);
+  line(pad,top,W-pad,top,1.5);
+  ['商品名','単位','数量','単価','金額','備考'].forEach((h,i)=>txt(h,(cols[i]+cols[i+1])/2,top+27,17,{a:'center',b:1}));
+  let y=top+rh; line(pad,y,W-pad,y);
+  const rows=goods.map(i=>[i.name,i.unit||'',i.qty,i.price,(Number(i.qty)||0)*(Number(i.price)||0),(i.tax??8)+'%']);
+  if(ship) rows.push(['送料','式',ship.qty||1,ship.price,(Number(ship.qty)||1)*(Number(ship.price)||0),(ship.tax??10)+'%']);
+  rows.push(['小計（税抜）','','','',sub,'']);
+  taxes.forEach(t=>rows.push(['消費税 '+t.rate+'%（対象 '+Math.round(t.base).toLocaleString('ja-JP')+'円）','','','',t.tax,'']));
+  rows.push(['合計（税込）','','','',sub+taxSum,'']);
+  const n=Math.max(rows.length,10);
+  for(let r=0;r<n;r++){
+    const row=rows[r]; const yy=y+r*rh;
+    if(row){
+      const bold=/^合計/.test(row[0]);
+      txt(row[0],cols[0]+10,yy+27,row[0].length>22?14:17,{b:bold}); txt(row[1],(cols[1]+cols[2])/2,yy+27,16,{a:'center'});
+      txt(row[2]===''?'':row[2],cols[3]-10,yy+27,17,{a:'right'});
+      txt(row[3]===''?'':Number(row[3]).toLocaleString('ja-JP'),cols[4]-10,yy+27,17,{a:'right',c:'#1a3fa0'});
+      txt(row[4]===''?'':Number(row[4]).toLocaleString('ja-JP'),cols[5]-10,yy+27,17,{a:'right',c:'#1a3fa0',b:bold});
+      txt(row[5],(cols[5]+cols[6])/2,yy+27,15,{a:'center',c:'#1a3fa0'});
+    }
+    line(pad,yy+rh,W-pad,yy+rh,0.6);
+  }
+  const bottom=y+n*rh; cols.forEach(x=>line(x,top,x,bottom)); line(pad,bottom,W-pad,bottom,1.5);
+  // 発送先
+  let by=bottom+50;
+  txt('発送先：'+(o.shipCode||''),pad,by,17,{c:'#555'}); by+=34;
+  txt(o.shipTo||o.customer||'',pad,by,21,{b:1}); by+=32;
+  String(o.addr||'').split(/\n/).filter(Boolean).slice(0,5).forEach(l=>{ txt(l,pad,by,17); by+=27; });
+  // 宅急便情報記入欄
+  const bx=W/2+10; let yy=bottom+50;
+  txt('宅急便情報記入欄',bx,yy,19,{b:1}); yy+=38;
+  const carrier=o.shipType==='冷蔵'?'佐川急便 クール便（冷蔵）':o.shipType==='冷凍'?'佐川急便 クール便（冷凍）':o.shipType==='negi'?'佐川急便（森下発送）':'佐川急便';
+  const box=(label,val)=>{ txt(label,bx,yy,16,{c:'#555'}); txt('【',bx+120,yy,18); txt(val,bx+140,yy,19,{c:'#1a3fa0',b:1}); txt('】',W-pad-20,yy,18); yy+=38; };
+  box('配送業者名',carrier); box('問合せNO',o.tracking||''); box('店着日時',o.arrival?fmtJ(o.arrival):'');
+  txt('配送時間指定（該当欄に◯）',bx,yy,16,{c:'#555'}); yy+=32;
+  let sx=bx; TIME_SLOTS.slice(0,4).forEach(t=>{ const sel=o.timeSlot===t; if(sel){ g.strokeStyle='#1a3fa0'; g.lineWidth=2; g.beginPath(); g.ellipse(sx+g.measureText(t).width/2+8,yy-7,g.measureText(t).width/2+14,16,0,0,Math.PI*2); g.stroke(); } txt(t,sx,yy,16,{c:sel?'#1a3fa0':'#333',b:sel}); sx+=g.measureText(t).width+40; });
+  yy+=50; txt('上記のとおり発送いたしました。',bx,yy,16);
+  // フッタ
+  txt((S['会社名']||'株式会社丹波農商')+'　'+(S['担当者']||'')+'　TEL '+(S['電話']||'')+'　'+(S['メール']||''),W/2,cv.height-40,14,{a:'center',c:'#666'});
+  cv.toBlob(async blob=>{
+    const name=(o.orderNo?'発注'+o.orderNo+'_':'')+(o.customer||'')+'_返信.png';
+    const file=new File([blob],name,{type:'image/png'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:name}); return; }catch(e){ if(e.name==='AbortError') return; } }
+    const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(url),10000); toast('返信画像を保存しました（LINEで送ってください）');
+  },'image/png');
+}
+function fmtJ(s){ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[1]}年${+m[2]}月${+m[3]}日`:String(s||''); }
 function openDetail(id){
   const o=orders.find(x=>x.id===id); if(!o) return;
   const si=STATUS.indexOf(o.status), c=SCOLOR[si];
@@ -556,6 +647,8 @@ function openDetail(id){
       <b>商品</b><ul>${(o.items||[]).map(i=>`<li>${esc(i.name)}${i.qty?` ×${esc(i.qty)}${esc(i.unit)}`:''}</li>`).join('')}</ul>
       <b>発送先</b><span>${esc(o.shipTo||o.customer)}${o.addr?`<br><span style="white-space:pre-wrap;color:var(--sub);font-size:13.5px">${esc(o.addr)}</span>`:''}</span>
       <b>担当</b><span>${esc(o.assignee||'未定')}</span>
+      ${o.orderNo||o.contact?`<b>発注No</b><span>${esc(o.orderNo||'—')}${o.contact?`　担当：${esc(o.contact)}`:''}</span>`:''}
+      ${o.tracking||o.arrival||o.timeSlot?`<b>配送</b><span>${o.tracking?`伝票 ${esc(o.tracking)}`:''}${o.arrival?`　店着 ${esc(o.arrival)}`:''}${o.timeSlot?`　${esc(o.timeSlot)}`:''}</span>`:''}
       <b>メモ</b><span style="white-space:pre-wrap">${esc(o.memo)||'—'}</span>
       <b>注文書</b><span>${fileHtml}</span>
       <b>金額</b><span>${orderTotal(o)||'—'}</span>
@@ -563,6 +656,7 @@ function openDetail(id){
     <div class="docline">
       ${o.deliveryUrl?`<a href="${esc(o.deliveryUrl)}" target="_blank" rel="noopener">📄 納品書 ${esc(o.deliveryNo||'')}</a>`:''}
       <button class="ghost" id="dDeliv" style="padding:7px 12px;font-size:13.5px">${o.deliveryUrl?'納品書を作り直す':'📄 納品書を作る'}</button>
+      <button class="ghost" id="dReply" style="padding:7px 12px;font-size:13.5px">📝 注文書への返信画像</button>
       ${o.invoiceUrl?`<a href="${esc(o.invoiceUrl)}" target="_blank" rel="noopener">🧾 請求書 ${esc(o.invoiceNo||'')}</a>`:''}
       ${!o.invoiceUrl&&STATUS.indexOf(o.status)>=2?`<button class="ghost" id="dInv" style="padding:7px 12px;font-size:13.5px">🧾 この注文だけ請求書</button>`:''}
     </div>
@@ -575,6 +669,7 @@ function openDetail(id){
     <div id="dConfirm"></div>`;
   $('dBody').querySelectorAll('[data-adv]').forEach(b=>b.onclick=()=>advance(o.id,+b.dataset.adv));
   $('dEdit').onclick=()=>{ $('detail').hidden=true; openForm(o); };
+  $('dReply').onclick=()=>replyImage(o);
   $('dDeliv').onclick=()=>{ if(!(o.items||[]).some(i=>i.name)){ toast('商品が未入力です'); return; } $('dDeliv').disabled=true; $('dDeliv').textContent='作成中…'; makeDelivery(o,true); };
   const dInv=$('dInv'); if(dInv) dInv.onclick=async()=>{ dInv.disabled=true; dInv.textContent='作成中…'; await makeInvoiceFor([o]); openDetail(o.id); };
   $('dDel').onclick=()=>{ $('dConfirm').innerHTML=`<div class="confirm">この注文を削除しますか？<div class="btns"><button class="ghost danger" id="dYes">削除する</button><button class="ghost" id="dNo">やめる</button></div></div>`;
