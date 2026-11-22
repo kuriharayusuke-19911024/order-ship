@@ -261,8 +261,24 @@ let orders = JSON.parse(localStorage.getItem('orders')||'[]');
 let pending = JSON.parse(localStorage.getItem('pending')||'[]');
 let me = localStorage.getItem('me')||'';
 let appKey = localStorage.getItem('appKey')||'';
-function askKey(msg){ const k=prompt(msg||'アプリの暗証番号を入力してください'); if(k===null) return false; appKey=k.trim(); localStorage.setItem('appKey',appKey); return true; }
-async function getJson(url){ let r=await fetch(url+'&key='+encodeURIComponent(appKey)); let j=await r.json(); if(j.error==='unauthorized'){ if(!askKey('暗証番号が必要です。アプリの暗証番号を入力してください')) throw new Error('暗証番号が未入力です'); r=await fetch(url+'&key='+encodeURIComponent(appKey)); j=await r.json(); if(j.error==='unauthorized') { appKey=''; localStorage.removeItem('appKey'); throw new Error('暗証番号が違います'); }; } return j; }
+let keyPromise=null, keyDeclined=false;
+// 暗証番号は1回だけ聞く（同時に複数の通信が走っても1つのダイアログにまとめる）。正しいか確認してから保存する
+function ensureKey(force){
+  if(appKey && !force) return Promise.resolve(true);
+  if(keyPromise) return keyPromise;
+  keyPromise=(async()=>{
+    for(let i=0;i<3;i++){
+      const k=prompt(i?'暗証番号が違います。もう一度入力してください':'アプリの暗証番号を入力してください（初回のみ）');
+      if(k===null){ keyDeclined=true; return false; }
+      const t=k.trim(); if(!t) continue;
+      try{ const j=await (await fetch(API_URL+'?action=master&key='+encodeURIComponent(t)+'&t='+Date.now())).json(); if(!j.error){ appKey=t; localStorage.setItem('appKey',t); keyDeclined=false; return true; } }catch(_){ }
+    }
+    keyDeclined=true; return false;
+  })().finally(()=>{ keyPromise=null; });
+  return keyPromise;
+}
+async function needKey(){ if(appKey) return; if(keyDeclined) throw new Error('暗証番号が未入力です'); if(!(await ensureKey())) throw new Error('暗証番号が未入力です'); }
+async function getJson(url){ await needKey(); let r=await fetch(url+'&key='+encodeURIComponent(appKey)); let j=await r.json(); if(j.error==='unauthorized'){ appKey=''; localStorage.removeItem('appKey'); if(!(await ensureKey(true))) throw new Error('暗証番号が未入力です'); r=await fetch(url+'&key='+encodeURIComponent(appKey)); j=await r.json(); } return j; }
 let filter = 'all', pendingFile = null;
 let custFilter = localStorage.getItem('custFilter')||'';
 // 要確認：LINEから自動登録されてまだ確認していない／送料・単価が未入力（入金済を除く）
@@ -337,10 +353,11 @@ $('me').onchange = e=>{ me=e.target.value; localStorage.setItem('me',me); render
 
 // ===== 同期（GAS） =====
 async function api(body){
+  await needKey();
   body.key = appKey;
   let r = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)});
   let j = await r.json();
-  if(j.error==='unauthorized'){ if(!askKey('暗証番号が必要です。アプリの暗証番号を入力してください')) throw new Error('暗証番号が未入力です'); body.key=appKey; r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)}); j=await r.json(); if(j.error==='unauthorized') { appKey=''; localStorage.removeItem('appKey'); throw new Error('暗証番号が違います'); }; }
+  if(j.error==='unauthorized'){ appKey=''; localStorage.removeItem('appKey'); if(!(await ensureKey(true))) throw new Error('暗証番号が未入力です'); body.key=appKey; r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)}); j=await r.json(); }
   if(j.error) throw new Error(j.error); return j;
 }
 async function pull(){
@@ -353,7 +370,7 @@ async function pull(){
     orders=[...map.values()]; persist(); render();
     await pushPending();
     setSync('ok','同期済み '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}));
-  }catch(e){ console.error(e); setSync('ng', /暗証番号/.test(e.message)? e.message+'（画面を再読み込みすると再入力できます）' : '同期できません（オフライン？）'); }
+  }catch(e){ console.error(e); setSync('ng', /暗証番号/.test(e.message)? '暗証番号が未入力です（ここをタップして入力）' : '同期できません（オフライン？）'); }
 }
 async function pushPending(){
   if(!API_URL) return;
@@ -717,7 +734,8 @@ function renderInv(){
 }
 
 // ===== 起動 =====
-render(); pull(); loadMaster();
+render(); (async()=>{ if(API_URL && !appKey) await ensureKey(); pull(); loadMaster(); })();
+$('syncmsg').parentElement.onclick=()=>{ if(!appKey){ keyDeclined=false; ensureKey().then(ok=>{ if(ok){ pull(); loadMaster(); } }); } };
 setInterval(pull, 60*1000);
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) pull(); });
 </script>
