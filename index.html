@@ -35,6 +35,8 @@ a{color:var(--kuri-2)}
 .chip{flex:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 12px;font-size:13.5px;white-space:nowrap}
 .chip b{margin-left:4px;font-weight:700}
 .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chip.warn{border-color:#d9480f;color:#d9480f;background:#fff4ec}.chip.warn.on{background:#d9480f;color:#fff}
+.needchk{display:inline-block;background:#fff4ec;color:#d9480f;border:1px solid #f3c8ad;border-radius:8px;padding:2px 8px;font-size:12.5px;margin:4px 0}
 .tools{display:flex;gap:8px;padding:6px 14px 4px;align-items:center}
 .tools input{flex:1;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:var(--card)}
 .tools select{border:1px solid var(--line);border-radius:8px;padding:7px 8px;background:var(--card);font-size:13.5px}
@@ -149,6 +151,7 @@ a{color:var(--kuri-2)}
 <div class="chips" id="chips"></div>
 <div class="tools">
   <input id="q" type="search" placeholder="注文元・商品・発送先で検索">
+  <select id="cust" style="max-width:42%"><option value="">会社：すべて</option></select>
   <select id="sort"><option value="due">納期順</option><option value="new">新しい順</option></select>
   <button class="ghost" id="openInv" style="padding:7px 10px;font-size:13.5px;white-space:nowrap">請求書</button>
 </div>
@@ -261,6 +264,9 @@ let appKey = localStorage.getItem('appKey')||'';
 function askKey(msg){ const k=prompt(msg||'アプリの暗証番号を入力してください'); if(k===null) return false; appKey=k.trim(); localStorage.setItem('appKey',appKey); return true; }
 async function getJson(url){ let r=await fetch(url+'&key='+encodeURIComponent(appKey)); let j=await r.json(); if(j.error==='unauthorized'){ if(!askKey('暗証番号が必要です。アプリの暗証番号を入力してください')) throw new Error('暗証番号が未入力です'); r=await fetch(url+'&key='+encodeURIComponent(appKey)); j=await r.json(); if(j.error==='unauthorized') { appKey=''; localStorage.removeItem('appKey'); throw new Error('暗証番号が違います'); }; } return j; }
 let filter = 'all', pendingFile = null;
+let custFilter = localStorage.getItem('custFilter')||'';
+// 要確認：LINEから自動登録されてまだ確認していない／送料・単価が未入力（入金済を除く）
+function needsCheck(o){ if(o.deleted||o.status==='入金済') return false; if(o.viaLine && !o.checked) return true; const its=(o.items||[]).filter(i=>i.name); if(!its.length) return true; if(its.some(i=>i.name!=='送料' && !(Number(i.price)>0))) return true; if(!o.shipType) return true; return false; }
 let master = JSON.parse(localStorage.getItem('master')||'{"settings":{},"products":[],"ship":[]}');
 const ZONES = ['南九州','北九州','四国','中国','関西','北陸','東海','信越','関東','南東北','北東北','北海道'];
 const PREF_ZONE = {'熊本':0,'宮崎':0,'鹿児島':0,'福岡':1,'佐賀':1,'長崎':1,'大分':1,'徳島':2,'香川':2,'愛媛':2,'高知':2,'鳥取':3,'島根':3,'岡山':3,'広島':3,'山口':3,'滋賀':4,'京都':4,'大阪':4,'兵庫':4,'奈良':4,'和歌山':4,'富山':5,'石川':5,'福井':5,'岐阜':6,'静岡':6,'愛知':6,'三重':6,'新潟':7,'長野':7,'茨城':8,'栃木':8,'群馬':8,'埼玉':8,'千葉':8,'東京':8,'神奈川':8,'山梨':8,'宮城':9,'山形':9,'福島':9,'青森':10,'岩手':10,'秋田':10,'北海道':11,'沖縄':-1};
@@ -379,12 +385,17 @@ function renderMonthly(){
 function render(){
   renderMonthly();
   const vis = visible();
-  const counts = {all:vis.length, mine:vis.filter(o=>o.assignee===me && o.status!=='入金済').length};
-  STATUS.forEach(s=>counts[s]=vis.filter(o=>o.status===s).length);
-  const chips = [['all','すべて'],['mine','自分の担当'],...STATUS.map(s=>[s,s])];
-  $('chips').innerHTML = chips.map(([k,l])=>`<button class="chip ${filter===k?'on':''}" data-k="${k}">${l}<b>${counts[k]}</b></button>`).join('');
+  // 会社の選択肢
+  const custs=[...new Set(vis.map(o=>o.customer).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+  if(custFilter && !custs.includes(custFilter)) custFilter='';
+  $('cust').innerHTML='<option value="">会社：すべて</option>'+custs.map(c=>`<option value="${esc(c)}" ${c===custFilter?'selected':''}>${esc(c)}（${vis.filter(o=>o.customer===c).length}）</option>`).join('');
+  const byCust = custFilter ? vis.filter(o=>o.customer===custFilter) : vis;
+  const counts = {all:byCust.length, check:byCust.filter(needsCheck).length, mine:byCust.filter(o=>o.assignee===me && o.status!=='入金済').length};
+  STATUS.forEach(s=>counts[s]=byCust.filter(o=>o.status===s).length);
+  const chips = [['check','⚠ 要確認'],['all','すべて'],['mine','自分の担当'],...STATUS.map(s=>[s,s])];
+  $('chips').innerHTML = chips.map(([k,l])=>`<button class="chip ${filter===k?'on':''} ${k==='check'&&counts.check?'warn':''}" data-k="${k}">${l}<b>${counts[k]}</b></button>`).join('');
   const q = $('q').value.trim();
-  let list = vis.filter(o=> filter==='all' ? true : filter==='mine' ? (o.assignee===me && o.status!=='入金済') : o.status===filter);
+  let list = byCust.filter(o=> filter==='all' ? true : filter==='check' ? needsCheck(o) : filter==='mine' ? (o.assignee===me && o.status!=='入金済') : o.status===filter);
   if(q) list = list.filter(o=>[o.customer,o.shipTo,o.memo,(o.items||[]).map(i=>i.name).join(' ')].join(' ').includes(q));
   const sort = $('sort').value;
   list.sort((a,b)=> sort==='new' ? (b.updatedAt>a.updatedAt?1:-1) : ((a.due||'9')+a.orderDate).localeCompare((b.due||'9')+b.orderDate));
@@ -401,6 +412,7 @@ function card(o){
   const late = o.due && o.due<today() && si<2;
   return `<div class="card ${o.assignee===me?'mine':''}" data-id="${o.id}" style="--c:${c}">
     <div class="h"><span class="cust">${esc(o.customer||'（注文元未入力）')}</span><span class="date">注文 ${fmt(o.orderDate)}</span></div>
+    ${needsCheck(o)?`<div class="needchk">⚠ 要確認${o.viaLine&&!o.checked?'（LINEから自動登録）':''}${!o.shipType?'・送料未設定':''}${(o.items||[]).some(i=>i.name&&i.name!=='送料'&&!(Number(i.price)>0))?'・単価未入力':''}</div>`:''}
     <div class="items">${esc(itemsText(o))}</div>
     <div class="meta"><span class="${late?'late':''}">納期 ${fmt(o.due)}${late?'（遅れ）':''}</span><span>担当 ${esc(o.assignee||'未定')}</span>${o.shipTo?`<span>宛先 ${esc(o.shipTo)}</span>`:''}${orderTotal(o)?`<span>${orderTotal(o)}</span>`:''}${o.fileUrl||o.fileData?`<span class="clip">📎 注文書</span>`:''}${o.deliveryUrl?`<span class="clip">📄 納品書</span>`:''}${o.invoiceUrl?`<span class="clip">🧾 請求書</span>`:''}</div>
     <div class="steps">${STATUS.map((s,i)=>`<i class="${i<=si?'done':''}"></i>`).join('')}</div>
@@ -409,6 +421,7 @@ function card(o){
 }
 $('chips').onclick=e=>{const b=e.target.closest('.chip'); if(b){filter=b.dataset.k; render();}};
 $('q').oninput=render; $('sort').onchange=render;
+$('cust').onchange=e=>{ custFilter=e.target.value; localStorage.setItem('custFilter',custFilter); render(); };
 $('list').onclick=e=>{
   const nb=e.target.closest('[data-next]'); if(nb){ e.stopPropagation(); advance(nb.dataset.next,1); return; }
   const c=e.target.closest('.card'); if(c) openDetail(c.dataset.id);
@@ -553,6 +566,7 @@ $('save').onclick=async()=>{
     shipType:$('fShipType').value, size:$('fSize').value, pref:$('fPref').value
   });
   if(!o.assignee && (o.shipType==='negi' || items.some(it=>/ねぎ|ネギ|葱/.test(it.name)))) o.assignee='森下';
+  if(o.viaLine) o.checked=true;
   if(!old) o.history.push({at:now(),by:me||'（名前未設定）',to:o.status+'（登録）'});
   else if(old.status!==o.status) o.history.push({at:now(),by:me||'（名前未設定）',to:o.status});
   $('save').disabled=true; $('save').textContent='保存中…';
@@ -671,10 +685,12 @@ function openDetail(id){
       <div class="stbtns">${si<4?`<button class="next" data-adv="1">${STEP_LABEL[si]}</button>`:''}${si>0?`<button class="back" data-adv="-1">ひとつ戻す</button>`:''}</div>
       <div class="hist">${(o.history||[]).slice().reverse().map(h=>`<div>${new Date(h.at).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}　${esc(h.by)} → ${esc(h.to)}</div>`).join('')||'<div>履歴なし</div>'}</div>
     </div>
-    <div class="btns"><button class="ghost" id="dEdit">✎ 編集</button><button class="ghost danger" id="dDel">削除</button></div>
+    ${needsCheck(o)?`<div class="needchk" style="margin:8px 0">⚠ 要確認：${o.viaLine&&!o.checked?'LINEから自動登録された注文です。内容を確認してください':'送料または単価が未入力です'}</div>`:''}
+    <div class="btns">${needsCheck(o)&&!(o.items||[]).some(i=>i.name&&i.name!=='送料'&&!(Number(i.price)>0))&&o.shipType?`<button id="dChecked">✓ 確認済みにする</button>`:''}<button class="ghost" id="dEdit">✎ 編集</button><button class="ghost danger" id="dDel">削除</button></div>
     <div id="dConfirm"></div>`;
   $('dBody').querySelectorAll('[data-adv]').forEach(b=>b.onclick=()=>advance(o.id,+b.dataset.adv));
   $('dEdit').onclick=()=>{ $('detail').hidden=true; openForm(o); };
+  const dChk=$('dChecked'); if(dChk) dChk.onclick=()=>{ o.checked=true; o.checkedBy=me; saveOrder(o); toast('確認済みにしました'); openDetail(o.id); };
   $('dReply').onclick=()=>replyImage(o);
   $('dDeliv').onclick=()=>{ if(!(o.items||[]).some(i=>i.name)){ toast('商品が未入力です'); return; } $('dDeliv').disabled=true; $('dDeliv').textContent='作成中…'; makeDelivery(o,true); };
   const dInv=$('dInv'); if(dInv) dInv.onclick=async()=>{ dInv.disabled=true; dInv.textContent='作成中…'; await makeInvoiceFor([o]); openDetail(o.id); };
