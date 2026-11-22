@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>注文・発送管理｜栗原の丹波栗</title>
 <meta name="theme-color" content="#5a3a1c">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="注文発送">
 <style>
 :root{
   --paper:#f4f3ee; --card:#ffffff; --ink:#22201b; --sub:#6d685e; --line:#dedad0;
@@ -36,6 +41,19 @@ a{color:var(--kuri-2)}
 .chip b{margin-left:4px;font-weight:700}
 .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .chip.warn{border-color:#d9480f;color:#d9480f;background:#fff4ec}.chip.warn.on{background:#d9480f;color:#fff}
+.todo{margin:10px 12px 0;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.todo h3{margin:0 0 6px;font-size:14px;color:var(--sub);font-weight:600}
+.todo .tl{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.todo button{border:1px solid var(--line);background:#f7f4ee;border-radius:10px;padding:8px 10px;text-align:left;font-size:13.5px;display:flex;justify-content:space-between;align-items:center}
+.todo button b{font-size:18px;margin-left:6px}.todo button.zero{opacity:.45}.todo button.hot{border-color:#d9480f;background:#fff4ec;color:#d9480f}
+.dhead{font-size:13px;color:var(--sub);font-weight:700;margin:6px 2px -4px;display:flex;align-items:center;gap:8px}.dhead:after{content:"";flex:1;border-top:1px dashed var(--line)}.dhead.late{color:var(--danger)}.dhead.today{color:#d9861c}
+.cthumb{width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex:none;margin-left:8px}
+.card .h{align-items:flex-start}.card .h .ht{flex:1;display:flex;justify-content:space-between;gap:8px;align-items:baseline;min-width:0}
+.card.trash{opacity:.7;border-style:dashed}
+.chip.trash{color:var(--sub)}
+.stat{margin:8px 0 14px}.stat h4{margin:0 0 6px;font-size:14px}.bar{display:grid;grid-template-columns:5.5em 1fr 6em;gap:8px;align-items:center;font-size:13px;margin:3px 0}.bar i{display:block;height:14px;background:var(--kuri-2);border-radius:4px;min-width:2px}.bar span:last-child{text-align:right;white-space:nowrap}
+.limitbar{margin:8px 14px 0;background:#eef4ff;border:1px solid #b9cdf3;border-radius:10px;padding:8px 12px;font-size:13px}
+.hist .chg{color:#555}
 .needchk{display:inline-block;background:#fff4ec;color:#d9480f;border:1px solid #f3c8ad;border-radius:8px;padding:2px 8px;font-size:12.5px;margin:4px 0}
 .tools{display:flex;gap:8px;padding:6px 14px 4px;align-items:center}
 .tools input{flex:1;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:var(--card)}
@@ -143,8 +161,13 @@ a{color:var(--kuri-2)}
 
 <div class="notice" id="noapi" hidden>API_URLが未設定のため、この端末だけに保存されています。共有するにはGASのURLを設定してください。</div>
 
+<div class="limitbar" id="limitbar" hidden></div>
+<div class="todo" id="todo">
+  <h3>今日やること</h3>
+  <div class="tl" id="todoList"></div>
+</div>
 <div class="monthly" id="monthly">
-  <div class="mrow"><button class="mnav" id="mPrev">‹</button><b id="mLabel"></b><button class="mnav" id="mNext">›</button><span class="msub">注文日で集計</span></div>
+  <div class="mrow"><button class="mnav" id="mPrev">‹</button><b id="mLabel"></b><button class="mnav" id="mNext">›</button><span class="msub">注文日で集計</span><button class="mnav" id="openStat" title="売上グラフ" style="width:auto;padding:0 8px;font-size:14px">📊</button></div>
   <div class="mstats"><div><small>件数</small><b id="mCount">0</b></div><div><small>税込合計</small><b id="mTotal">¥0</b></div><div><small>税抜</small><b id="mSub">¥0</b></div><div><small>未入金</small><b id="mUnpaid">¥0</b></div></div>
   <div class="mby" id="mBy"></div>
 </div>
@@ -152,6 +175,7 @@ a{color:var(--kuri-2)}
 <div class="tools">
   <input id="q" type="search" placeholder="注文元・商品・発送先で検索">
   <select id="cust" style="max-width:42%"><option value="">会社：すべて</option></select>
+  <select id="dest" style="max-width:38%" hidden><option value="">発送先：すべて</option></select>
   <select id="sort"><option value="due">納期順</option><option value="new">新しい順</option></select>
   <button class="ghost" id="openInv" style="padding:7px 10px;font-size:13.5px;white-space:nowrap">請求書</button>
 </div>
@@ -244,6 +268,13 @@ a{color:var(--kuri-2)}
   </div>
 </div>
 
+<!-- 売上 -->
+<div class="sheet" id="stat" hidden>
+  <div class="inner">
+    <div class="bar" style="display:flex"><h2>売上のようす</h2><button class="x" data-close="stat">×</button></div>
+    <div class="body" id="statBody">読み込み中…</div>
+  </div>
+</div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -281,6 +312,12 @@ async function needKey(){ if(appKey) return; if(keyDeclined) throw new Error('�
 async function getJson(url){ await needKey(); let r=await fetch(url+'&key='+encodeURIComponent(appKey)); let j=await r.json(); if(j.error==='unauthorized'){ appKey=''; localStorage.removeItem('appKey'); if(!(await ensureKey(true))) throw new Error('暗証番号が未入力です'); r=await fetch(url+'&key='+encodeURIComponent(appKey)); j=await r.json(); } return j; }
 let filter = 'all', pendingFile = null;
 let custFilter = localStorage.getItem('custFilter')||'';
+let destFilter = '';
+let limited = '';   // 担当者限定モード（限定暗証番号で入った人の名前）
+const addDays = n=>{ const d=new Date(); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const isTodayShip = o=>o.status==='発送依頼' && (!o.due || o.due<=today());
+const isSoon = o=>(o.status==='受注'||o.status==='発送依頼') && o.due && o.due>today() && o.due<=addDays(2);
+const isNoTrack = o=>o.status==='発送済' && !o.tracking && (o.shipDate||'')>=addDays(-7);
 // 要確認：LINEから自動登録されてまだ確認していない／送料・単価が未入力（入金済を除く）
 function needsCheck(o){ if(o.deleted||o.status==='入金済') return false; if(o.viaLine && !o.checked) return true; const its=(o.items||[]).filter(i=>i.name); if(!its.length) return true; if(its.some(i=>i.name!=='送料' && !(Number(i.price)>0))) return true; if(!o.shipType) return true; return false; }
 let master = JSON.parse(localStorage.getItem('master')||'{"settings":{},"products":[],"ship":[]}');
@@ -365,6 +402,7 @@ async function pull(){
   setSync('busy','同期中…');
   try{
     const j = await getJson(API_URL+'?action=list&t='+Date.now());
+    if(j.limitedTo!==undefined){ limited=j.limitedTo||''; applyLimited(); }
     const map = new Map(orders.map(o=>[o.id,o]));
     (j.orders||[]).forEach(ro=>{ const lo=map.get(ro.id); if(!lo || (ro.updatedAt>lo.updatedAt && !pending.includes(ro.id))) map.set(ro.id,ro); });
     orders=[...map.values()]; persist(); render();
@@ -379,6 +417,10 @@ async function pushPending(){
     try{ await api({action:'save',order:o}); pending=pending.filter(x=>x!==id); persist(); }
     catch(e){ console.error(e); setSync('ng','送信待ちあり（あとで再送します）'); return; }
   }
+}
+function applyLimited(){
+  $('limitbar').hidden=!limited; if(limited){ $('limitbar').textContent=limited+'さんの担当分だけ表示しています（発送の報告のみできます）'; me=limited; localStorage.setItem('me',me); $('me').innerHTML=`<option>${esc(limited)}</option>`; }
+  $('fab').hidden=!!limited; $('openInv').hidden=!!limited; $('monthly').hidden=!!limited; $('openStat').hidden=!!limited;
 }
 function saveOrder(o){
   o.updatedAt = now();
@@ -406,29 +448,56 @@ function render(){
   const custs=[...new Set(vis.map(o=>o.customer).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
   if(custFilter && !custs.includes(custFilter)) custFilter='';
   $('cust').innerHTML='<option value="">会社：すべて</option>'+custs.map(c=>`<option value="${esc(c)}" ${c===custFilter?'selected':''}>${esc(c)}（${vis.filter(o=>o.customer===c).length}）</option>`).join('');
-  const byCust = custFilter ? vis.filter(o=>o.customer===custFilter) : vis;
-  const counts = {all:byCust.length, check:byCust.filter(needsCheck).length, mine:byCust.filter(o=>o.assignee===me && o.status!=='入金済').length};
+  // 今日やること
+  const todo=[['check','⚠ 要確認',vis.filter(needsCheck).length,'hot'],['todayShip','🚚 今日発送する',vis.filter(isTodayShip).length,'hot'],['soon','📅 納期が2日以内',vis.filter(isSoon).length,''],['notrack','🔢 伝票番号なし',vis.filter(isNoTrack).length,'']];
+  $('todoList').innerHTML=todo.map(([k,l,n,h])=>`<button data-k="${k}" class="${n?h:'zero'}">${l}<b>${n}</b></button>`).join('');
+  let byCust = custFilter ? vis.filter(o=>o.customer===custFilter) : vis;
+  // 発送先の絞り込み（会社を選んだときだけ）
+  const dests = custFilter ? [...new Set(byCust.map(o=>o.shipTo||'').filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja')) : [];
+  if(destFilter && !dests.includes(destFilter)) destFilter='';
+  $('dest').hidden = dests.length<2;
+  $('dest').innerHTML='<option value="">発送先：すべて</option>'+dests.map(d=>`<option value="${esc(d)}" ${d===destFilter?'selected':''}>${esc(d)}（${byCust.filter(o=>o.shipTo===d).length}）</option>`).join('');
+  if(destFilter) byCust = byCust.filter(o=>o.shipTo===destFilter);
+  const trash = orders.filter(o=>o.deleted);
+  const counts = {all:byCust.length, check:byCust.filter(needsCheck).length, mine:byCust.filter(o=>o.assignee===me && o.status!=='入金済').length, todayShip:byCust.filter(isTodayShip).length, soon:byCust.filter(isSoon).length, notrack:byCust.filter(isNoTrack).length, trash:trash.length};
   STATUS.forEach(s=>counts[s]=byCust.filter(o=>o.status===s).length);
-  const chips = [['check','⚠ 要確認'],['all','すべて'],['mine','自分の担当'],...STATUS.map(s=>[s,s])];
-  $('chips').innerHTML = chips.map(([k,l])=>`<button class="chip ${filter===k?'on':''} ${k==='check'&&counts.check?'warn':''}" data-k="${k}">${l}<b>${counts[k]}</b></button>`).join('');
+  const chips = [['check','⚠ 要確認'],['all','すべて'],['mine','自分の担当'],...STATUS.map(s=>[s,s]),['trash','🗑 ゴミ箱']];
+  const extraChip = {todayShip:'🚚 今日発送',soon:'📅 納期2日以内',notrack:'🔢 伝票なし'}[filter];
+  $('chips').innerHTML = (extraChip?`<button class="chip on" data-k="${filter}">${extraChip}<b>${counts[filter]}</b></button>`:'')+chips.map(([k,l])=>`<button class="chip ${filter===k?'on':''} ${k==='check'&&counts.check?'warn':''} ${k==='trash'?'trash':''}" data-k="${k}">${l}<b>${counts[k]}</b></button>`).join('');
   const q = $('q').value.trim();
-  let list = byCust.filter(o=> filter==='all' ? true : filter==='check' ? needsCheck(o) : filter==='mine' ? (o.assignee===me && o.status!=='入金済') : o.status===filter);
+  let list = filter==='trash' ? trash : byCust.filter(o=> filter==='all' ? true : filter==='check' ? needsCheck(o) : filter==='mine' ? (o.assignee===me && o.status!=='入金済') : filter==='todayShip' ? isTodayShip(o) : filter==='soon' ? isSoon(o) : filter==='notrack' ? isNoTrack(o) : o.status===filter);
   if(q) list = list.filter(o=>[o.customer,o.shipTo,o.memo,(o.items||[]).map(i=>i.name).join(' ')].join(' ').includes(q));
   const sort = $('sort').value;
   list.sort((a,b)=> sort==='new' ? (b.updatedAt>a.updatedAt?1:-1) : ((a.due||'9')+a.orderDate).localeCompare((b.due||'9')+b.orderDate));
   if(filter==='all') list.sort((a,b)=> (a.status==='入金済')-(b.status==='入金済'));
-  $('list').innerHTML = list.length ? list.map(card).join('') : `<div class="empty">${q?'該当する注文はありません':'注文はまだありません。右下の「＋ 注文を登録」から追加できます。'}</div>`;
+  // 納期ごとの見出し
+  let html='';
+  if(filter==='trash'){ html = list.length ? `<div class="notice" style="margin:0">削除から30日で自動的に消えます。<button class="ghost danger" id="purgeAll" style="padding:4px 10px;font-size:13px;margin-left:8px">今すぐ空にする</button></div>`+list.map(o=>card(o,true)).join('') : '<div class="empty">ゴミ箱は空です</div>'; }
+  else if(sort==='due' && list.length){
+    let last=null; const wd=['日','月','火','水','木','金','土'];
+    list.forEach(o=>{ const key=(o.status==='入金済')?'done':(o.due||'none'); if(key!==last){ last=key; const cnt=list.filter(x=>((x.status==='入金済')?'done':(x.due||'none'))===key).length; let label, cls='';
+        if(key==='done') label='入金済'; else if(key==='none') label='納期未定'; else { const d=new Date(key+'T00:00:00'); label=`${d.getMonth()+1}/${d.getDate()}（${wd[d.getDay()]}）`; if(key<today()&&o.status!=='発送済'&&o.status!=='請求済'){ cls='late'; label+=' 納期超過'; } else if(key===today()){ cls='today'; label+=' 今日'; } }
+        html+=`<div class="dhead ${cls}">${label}・${cnt}件</div>`; } html+=card(o); });
+  } else html = list.map(card).join('');
+  $('list').innerHTML = html || `<div class="empty">${q?'該当する注文はありません':'注文はまだありません。右下の「＋ 注文を登録」から追加できます。'}</div>`;
+  const pa=$('purgeAll'); if(pa) pa.onclick=async()=>{ if(!confirm('ゴミ箱の注文をすべて完全に削除します。元に戻せません。よろしいですか？')) return; try{ await api({action:'purge'}); orders=orders.filter(o=>!o.deleted); persist(); render(); toast('ゴミ箱を空にしました'); }catch(e){ toast('失敗：'+e.message); } };
   // datalists
   $('custList').innerHTML=[...new Set(orders.map(o=>o.customer).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('');
   renderProdList();
 }
 function itemsText(o){ return (o.items||[]).map(i=>`${i.name}${i.qty?` ×${i.qty}${i.unit||''}`:''}`).join('、')||'（商品未入力）'; }
 function orderTotal(o){ const c=calcItems(o.items); return c.sub? yen(c.total)+'（税込）' : ''; }
-function card(o){
+function card(o, inTrash){
   const si = STATUS.indexOf(o.status), c=SCOLOR[si];
   const late = o.due && o.due<today() && si<2;
+  const th = (o.fileUrl && o.fileType?.startsWith('image')) ? `<img class="cthumb" src="${esc(o.fileUrl)}=s120" alt="" loading="lazy">` : '';
+  if(inTrash) return `<div class="card trash" data-id="${o.id}" style="--c:${c}">
+    <div class="h"><div class="ht"><span class="cust">${esc(o.customer||'（注文元未入力）')}</span><span class="date">削除 ${fmt((o.deletedAt||o.updatedAt||'').slice(0,10))}</span></div></div>
+    <div class="items">${esc(itemsText(o))}</div>
+    <div class="meta"><span>納期 ${fmt(o.due)}</span><span>${esc(o.status)}</span>${orderTotal(o)?`<span>${orderTotal(o)}</span>`:''}</div>
+    <div class="stline"><span></span><button class="next" data-restore="${o.id}" style="--c:var(--s3)">↩ 元に戻す</button></div></div>`;
   return `<div class="card ${o.assignee===me?'mine':''}" data-id="${o.id}" style="--c:${c}">
-    <div class="h"><span class="cust">${esc(o.customer||'（注文元未入力）')}</span><span class="date">注文 ${fmt(o.orderDate)}</span></div>
+    <div class="h"><div class="ht"><span class="cust">${esc(o.customer||'（注文元未入力）')}</span><span class="date">注文 ${fmt(o.orderDate)}</span></div>${th}</div>
     ${needsCheck(o)?`<div class="needchk">⚠ 要確認${o.viaLine&&!o.checked?'（LINEから自動登録）':''}${!o.shipType?'・送料未設定':''}${(o.items||[]).some(i=>i.name&&i.name!=='送料'&&!(Number(i.price)>0))?'・単価未入力':''}</div>`:''}
     <div class="items">${esc(itemsText(o))}</div>
     <div class="meta"><span class="${late?'late':''}">納期 ${fmt(o.due)}${late?'（遅れ）':''}</span><span>担当 ${esc(o.assignee||'未定')}</span>${o.shipTo?`<span>宛先 ${esc(o.shipTo)}</span>`:''}${orderTotal(o)?`<span>${orderTotal(o)}</span>`:''}${o.fileUrl||o.fileData?`<span class="clip">📎 注文書</span>`:''}${o.deliveryUrl?`<span class="clip">📄 納品書</span>`:''}${o.invoiceUrl?`<span class="clip">🧾 請求書</span>`:''}</div>
@@ -438,14 +507,19 @@ function card(o){
 }
 $('chips').onclick=e=>{const b=e.target.closest('.chip'); if(b){filter=b.dataset.k; render();}};
 $('q').oninput=render; $('sort').onchange=render;
-$('cust').onchange=e=>{ custFilter=e.target.value; localStorage.setItem('custFilter',custFilter); render(); };
+$('cust').onchange=e=>{ custFilter=e.target.value; destFilter=''; localStorage.setItem('custFilter',custFilter); render(); };
+$('todoList').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; filter=b.dataset.k; custFilter=''; destFilter=''; localStorage.setItem('custFilter',''); render(); $('chips').scrollIntoView({behavior:'smooth',block:'start'}); };
+$('dest').onchange=e=>{ destFilter=e.target.value; render(); };
 $('list').onclick=e=>{
+  const rb=e.target.closest('[data-restore]'); if(rb){ e.stopPropagation(); const o=orders.find(x=>x.id===rb.dataset.restore); if(o){ delete o.deleted; delete o.deletedAt; (o.history=o.history||[]).push({at:now(),by:me||'（名前未設定）',to:'ゴミ箱から復元'}); saveOrder(o); toast('元に戻しました'); } return; }
+  if(filter==='trash') return;
   const nb=e.target.closest('[data-next]'); if(nb){ e.stopPropagation(); advance(nb.dataset.next,1); return; }
   const c=e.target.closest('.card'); if(c) openDetail(c.dataset.id);
 };
 function advance(id,dir){
   if(!me){ toast('先に右上で自分の名前を選んでください'); return; }
   const o=orders.find(x=>x.id===id); const i=STATUS.indexOf(o.status)+dir; if(i<0||i>=STATUS.length) return;
+  if(limited && !(o.status==='発送依頼' && dir>0)){ toast('担当者限定モードでは「発送した」の報告だけできます'); return; }
   o.status=STATUS[i]; (o.history=o.history||[]).push({at:now(),by:me,to:o.status});
   if(dir>0 && o.status==='発送済' && !o.shipDate) o.shipDate=today();
   if(dir>0 && o.status==='発送済' && !o.tracking){ const t=window.prompt('伝票番号（問合せNo）があれば入力してください（なければ空欄でOK）',''); if(t && t.trim()) o.tracking=t.trim(); }
@@ -500,6 +574,7 @@ function openForm(o){
   pendingFile=null; $('fileName').textContent=''; $('fThumb').hidden=true; $('fMail').value='';
   $('formTitle').textContent=o?'注文を編集':'注文を登録';
   $('fId').value=o?.id||''; $('fDate').value=o?.orderDate||today(); $('fDue').value=o?.due||'';
+  if(o && !o.id) $('formTitle').textContent='注文を登録';
   $('fCust').value=o?.customer||''; $('fShipTo').value=o?.shipTo||''; $('fAddr').value=o?.addr||'';
   $('fAssignee').value=o?.assignee||''; $('fStatus').value=o?.status||'受注'; $('fMemo').value=o?.memo||'';
   $('items').innerHTML=''; ((o?.items?.length?o.items:[{}])).forEach(it=>$('items').appendChild(itemRow(it))); updSub();
@@ -585,7 +660,12 @@ $('save').onclick=async()=>{
   if(!o.assignee && (o.shipType==='negi' || items.some(it=>/ねぎ|ネギ|葱/.test(it.name)))) o.assignee='森下';
   if(o.viaLine) o.checked=true;
   if(!old) o.history.push({at:now(),by:me||'（名前未設定）',to:o.status+'（登録）'});
-  else if(old.status!==o.status) o.history.push({at:now(),by:me||'（名前未設定）',to:o.status});
+  else {
+    const chg=diffOrder(old,o);
+    if(old.status!==o.status) o.history.push({at:now(),by:me||'（名前未設定）',to:o.status, changes:chg.filter(c=>!/^ステータス/.test(c))});
+    else if(chg.length) o.history.push({at:now(),by:me||'（名前未設定）',to:'編集', changes:chg});
+  }
+  if(API_URL && o.shipType && o.shipType!=='negi' && o.shipType!=='none' && o.size && (!old || old.size!==o.size || old.shipType!==o.shipType)) api({action:'learn',order:o}).catch(()=>{});
   $('save').disabled=true; $('save').textContent='保存中…';
   try{
     if(pendingFile){
@@ -599,6 +679,15 @@ $('save').onclick=async()=>{
   $('save').disabled=false; $('save').textContent='保存する';
 };
 
+// 変更内容の差分（履歴用）
+const FIELD_LABEL={orderDate:'注文日',due:'納期',customer:'注文元',shipTo:'発送先',addr:'住所',assignee:'担当',status:'ステータス',memo:'メモ',shipDate:'発送日',orderNo:'発注No',contact:'先方担当',tracking:'伝票番号',arrival:'店着日',timeSlot:'時間指定',shipType:'便種',size:'サイズ',pref:'都道府県'};
+function diffOrder(a,b){
+  const out=[];
+  Object.keys(FIELD_LABEL).forEach(k=>{ const x=String(a[k]??''), y=String(b[k]??''); if(x!==y) out.push(`${FIELD_LABEL[k]}：${x||'（空）'}→${y||'（空）'}`); });
+  const ia=(a.items||[]).map(i=>`${i.name}×${i.qty}${i.unit||''}@${i.price}`).join('、'), ib=(b.items||[]).map(i=>`${i.name}×${i.qty}${i.unit||''}@${i.price}`).join('、');
+  if(ia!==ib) out.push(`商品：${ia||'（空）'}→${ib||'（空）'}`);
+  return out;
+}
 // ===== 詳細 =====
 
 // ===== 注文書への返信画像（商品・単価・送料・宅急便情報を記入した注文書）=====
@@ -693,29 +782,46 @@ function openDetail(id){
     <div class="docline">
       ${o.deliveryUrl?`<a href="${esc(o.deliveryUrl)}" target="_blank" rel="noopener">📄 納品書 ${esc(o.deliveryNo||'')}</a>`:''}
       <button class="ghost" id="dDeliv" style="padding:7px 12px;font-size:13.5px">${o.deliveryUrl?'納品書を作り直す':'📄 納品書を作る'}</button>
-      <button class="ghost" id="dReply" style="padding:7px 12px;font-size:13.5px">📝 注文書への返信画像</button>
+      <button class="ghost" id="dReplyLine" style="padding:7px 12px;font-size:13.5px">📤 返信画像をLINEで受け取る</button>
+      <button class="ghost" id="dReply" style="padding:7px 12px;font-size:13.5px">📝 返信画像（この端末で）</button>
+      <button class="ghost" id="dLabel" style="padding:7px 12px;font-size:13.5px">🏷 宛名ラベルPDF</button>
       ${o.invoiceUrl?`<a href="${esc(o.invoiceUrl)}" target="_blank" rel="noopener">🧾 請求書 ${esc(o.invoiceNo||'')}</a>`:''}
       ${!o.invoiceUrl&&STATUS.indexOf(o.status)>=2?`<button class="ghost" id="dInv" style="padding:7px 12px;font-size:13.5px">🧾 この注文だけ請求書</button>`:''}
     </div>
     <div class="stbox" style="--c:${c}">
       <div class="now">いまのステータス</div><div class="big">${esc(o.status)}</div>
       <div class="stbtns">${si<4?`<button class="next" data-adv="1">${STEP_LABEL[si]}</button>`:''}${si>0?`<button class="back" data-adv="-1">ひとつ戻す</button>`:''}</div>
-      <div class="hist">${(o.history||[]).slice().reverse().map(h=>`<div>${new Date(h.at).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}　${esc(h.by)} → ${esc(h.to)}</div>`).join('')||'<div>履歴なし</div>'}</div>
+      <div class="hist">${(o.history||[]).slice().reverse().map(h=>`<div>${new Date(h.at).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}　${esc(h.by)} → ${esc(h.to)}${h.changes&&h.changes.length?`<div class="chg">　${h.changes.map(esc).join('／')}</div>`:''}</div>`).join('')||'<div>履歴なし</div>'}</div>
     </div>
     ${needsCheck(o)?`<div class="needchk" style="margin:8px 0">⚠ 要確認：${o.viaLine&&!o.checked?'LINEから自動登録された注文です。内容を確認してください':'送料または単価が未入力です'}</div>`:''}
-    <div class="btns">${needsCheck(o)&&!(o.items||[]).some(i=>i.name&&i.name!=='送料'&&!(Number(i.price)>0))&&o.shipType?`<button id="dChecked">✓ 確認済みにする</button>`:''}<button class="ghost" id="dEdit">✎ 編集</button><button class="ghost danger" id="dDel">削除</button></div>
+    <div class="btns">${needsCheck(o)&&!(o.items||[]).some(i=>i.name&&i.name!=='送料'&&!(Number(i.price)>0))&&o.shipType?`<button id="dChecked">✓ 確認済みにする</button>`:''}<button class="ghost" id="dEdit">✎ 編集</button><button class="ghost" id="dAgain">🔁 同じ注文をもう一度</button><button class="ghost danger" id="dDel">削除</button></div>
     <div id="dConfirm"></div>`;
   $('dBody').querySelectorAll('[data-adv]').forEach(b=>b.onclick=()=>advance(o.id,+b.dataset.adv));
   $('dEdit').onclick=()=>{ $('detail').hidden=true; openForm(o); };
   const dChk=$('dChecked'); if(dChk) dChk.onclick=()=>{ o.checked=true; o.checkedBy=me; saveOrder(o); toast('確認済みにしました'); openDetail(o.id); };
   $('dReply').onclick=()=>replyImage(o);
+  $('dReplyLine').onclick=async()=>{ const b=$('dReplyLine'); b.disabled=true; b.textContent='作成中…（20秒ほど）'; try{ const r=await api({action:'replyimg',order:o,by:me}); toast(r.sent?'返信画像をLINEに送りました':'作成しました'); if(!r.sent&&r.url) window.open(r.url,'_blank'); }catch(e){ toast('作成できませんでした：'+e.message); } b.disabled=false; b.textContent='📤 返信画像をLINEで受け取る'; };
+  $('dLabel').onclick=async()=>{ const b=$('dLabel'); b.disabled=true; b.textContent='作成中…'; try{ const r=await api({action:'label',order:o}); window.open(r.url,'_blank'); }catch(e){ toast('作成できませんでした：'+e.message); } b.disabled=false; b.textContent='🏷 宛名ラベルPDF'; };
+  $('dAgain').onclick=()=>{ const c=Object.assign({},o,{id:'',orderDate:today(),due:'',status:'受注',shipDate:'',tracking:'',arrival:'',deliveryUrl:'',deliveryNo:'',invoiceUrl:'',invoiceNo:'',fileUrl:'',fileId:'',fileName:'',fileType:'',history:[],viaLine:false,checked:false,remindedAt:'',payRemindedAt:''}); $('detail').hidden=true; openForm(c); $('formTitle').textContent='同じ内容で新しく登録'; };
+  if(limited){ ['dEdit','dAgain','dDel','dDeliv','dReply','dReplyLine','dLabel','dInv','dChecked'].forEach(id=>{ const el=$(id); if(el) el.hidden=true; }); }
   $('dDeliv').onclick=()=>{ if(!(o.items||[]).some(i=>i.name)){ toast('商品が未入力です'); return; } $('dDeliv').disabled=true; $('dDeliv').textContent='作成中…'; makeDelivery(o,true); };
   const dInv=$('dInv'); if(dInv) dInv.onclick=async()=>{ dInv.disabled=true; dInv.textContent='作成中…'; await makeInvoiceFor([o]); openDetail(o.id); };
-  $('dDel').onclick=()=>{ $('dConfirm').innerHTML=`<div class="confirm">この注文を削除しますか？<div class="btns"><button class="ghost danger" id="dYes">削除する</button><button class="ghost" id="dNo">やめる</button></div></div>`;
-    $('dYes').onclick=()=>{ o.deleted=true; saveOrder(o); $('detail').hidden=true; toast('削除しました'); }; $('dNo').onclick=()=>$('dConfirm').innerHTML=''; };
+  $('dDel').onclick=()=>{ $('dConfirm').innerHTML=`<div class="confirm">この注文をゴミ箱に入れますか？（30日間は戻せます）<div class="btns"><button class="ghost danger" id="dYes">削除する</button><button class="ghost" id="dNo">やめる</button></div></div>`;
+    $('dYes').onclick=()=>{ o.deleted=true; o.deletedAt=now(); (o.history=o.history||[]).push({at:now(),by:me||'（名前未設定）',to:'ゴミ箱へ'}); saveOrder(o); $('detail').hidden=true; toast('ゴミ箱に入れました（30日で自動削除）'); }; $('dNo').onclick=()=>$('dConfirm').innerHTML=''; };
   $('detail').hidden=false; $('detail').querySelector('.inner').scrollTop=0;
 }
 
+// ===== 売上グラフ =====
+$('openStat').onclick=async()=>{ $('stat').hidden=false; $('statBody').textContent='読み込み中…'; try{ const j=await getJson(API_URL+'?action=stats&t='+Date.now()); renderStat(j); }catch(e){ $('statBody').textContent='読み込めませんでした：'+e.message; } };
+function renderStat(j){
+  const months=Object.keys(j.months||{}).sort().slice(-6); const mx=Math.max(1,...months.map(m=>j.months[m].total));
+  const bar=(label,v,max,right)=>`<div class="bar"><span>${esc(label)}</span><i style="width:${Math.round(v/max*100)}%"></i><span>${right}</span></div>`;
+  const custs=Object.entries(j.byCust||{}).sort((a,b)=>b[1]-a[1]).slice(0,8); const cm=Math.max(1,...custs.map(c=>c[1]));
+  const prods=Object.entries(j.byProd||{}).sort((a,b)=>b[1].amt-a[1].amt).slice(0,8); const pm=Math.max(1,...prods.map(p=>p[1].amt));
+  $('statBody').innerHTML=`<div class="stat"><h4>月別の売上（税込・直近6か月）</h4>${months.map(m=>bar(m.replace('-','/'),j.months[m].total,mx,yen(j.months[m].total)+'・'+j.months[m].count+'件')).join('')||'データなし'}</div>
+    <div class="stat"><h4>会社別（累計）</h4>${custs.map(([c,v])=>bar(c,v,cm,yen(v))).join('')}</div>
+    <div class="stat"><h4>商品別（累計・税抜）</h4>${prods.map(([p,v])=>bar(p,v.amt,pm,yen(v.amt)+'・'+v.qty+(v.unit||''))).join('')}</div>`;
+}
 // ===== 月末請求 =====
 $('mPrev').onclick=()=>shiftMonth(-1); $('mNext').onclick=()=>shiftMonth(1);
 $('openInv').onclick=()=>{ if(!$('invMonth').value){ const d=new Date(); $('invMonth').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); } renderInv(); $('inv').hidden=false; };
@@ -737,6 +843,7 @@ function renderInv(){
 render(); (async()=>{ if(API_URL && !appKey) await ensureKey(); pull(); loadMaster(); })();
 $('syncmsg').parentElement.onclick=()=>{ if(!appKey){ keyDeclined=false; ensureKey().then(ok=>{ if(ok){ pull(); loadMaster(); } }); } };
 setInterval(pull, 60*1000);
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) pull(); });
 </script>
 </body>
