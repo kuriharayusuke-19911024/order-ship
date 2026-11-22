@@ -182,7 +182,7 @@ a{color:var(--kuri-2)}
       <div class="f"><label>発送先住所・電話</label><textarea id="fAddr" placeholder="住所、電話番号、時間指定など"></textarea></div>
       <div class="f"><label>送料（住所から都道府県を判定して自動計算・税抜＋加算）</label>
         <div class="shiprow">
-          <select id="fShipType"><option value="">送料を選択…</option><option value="none">送料なし（引取など）</option><option value="常温">常温</option><option value="冷蔵">クール冷蔵</option><option value="冷凍">クール冷凍</option><option value="negi">岩津ねぎ（森さん発送）</option></select>
+          <select id="fShipType"><option value="">送料を選択…</option><option value="none">送料なし（引取など）</option><option value="常温">常温</option><option value="冷蔵">クール冷蔵</option><option value="冷凍">クール冷凍</option><option value="negi">岩津ねぎ（森下さん発送）</option></select>
           <select id="fSize"></select>
           <select id="fPref"></select>
           <span class="shipout" id="shipOut"></span>
@@ -246,8 +246,8 @@ a{color:var(--kuri-2)}
 <script>
 // ===== 設定 =====
 const API_URL = 'https://script.google.com/macros/s/AKfycbygQB1AB_PSgpIQM1Kzf_hxN8vwmDmEbMqwM_GGr8GuQCfUEFqDhenZLnGC2JuMDg5V/exec'; // ← GASのウェブアプリURLを貼る（空ならこの端末だけに保存）
-const MEMBERS = ['栗原直人','栗原優介','秋山龍之輔','栗原亜美','木村みき','栗原美智代','松本琉雅','森'];
-const NEGI_FEE = {kansai:1000, other:1500}; // 岩津ねぎ（森さん発送）の概算送料
+const MEMBERS = ['栗原直人','栗原優介','秋山龍之輔','栗原亜美','木村みき','栗原美智代','松本琉雅','森下'];
+const NEGI_FEE = {kansai:1000, other:1500}; // 岩津ねぎ（森下さん発送）の概算送料
 const TIME_SLOTS = ['午前中','12-14時','14-16時','16-18時','18-20時','19-21時'];
 const STATUS = ['受注','発送依頼','発送済','請求済','入金済'];
 const SCOLOR = ['var(--s1)','var(--s2)','var(--s3)','var(--s4)','var(--s5)'];
@@ -299,7 +299,7 @@ function fillShipUI(){
   $('fSize').innerHTML=sizes.map(z=>`<option value="${z}" ${String(z)===cur?'selected':''}>${z}サイズ</option>`).join('')||'<option value="">—</option>';
   if(!$('fPref').options.length) $('fPref').innerHTML='<option value="">都道府県</option>'+PREFS.map(p=>`<option value="${p}">${p}</option>`).join('');
   $('fSize').disabled=!type||type==='negi'; $('fPref').disabled=!type;
-  if(type==='negi' && !$('fAssignee').value) $('fAssignee').value='森';
+  if(type==='negi' && !$('fAssignee').value) $('fAssignee').value='森下';
 }
 function upsertShipItem(){
   const type=shipTypeVal(), size=$('fSize').value, pref=$('fPref').value;
@@ -546,7 +546,7 @@ $('save').onclick=async()=>{
     orderNo:$('fOrderNo').value.trim(), shipCode:$('fShipCode').value.trim(), contact:$('fContact').value.trim(), tracking:$('fTracking').value.trim(), arrival:$('fArrival').value, timeSlot:$('fTimeSlot').value,
     shipType:$('fShipType').value, size:$('fSize').value, pref:$('fPref').value
   });
-  if(!o.assignee && (o.shipType==='negi' || items.some(it=>/ねぎ|ネギ|葱/.test(it.name)))) o.assignee='森';
+  if(!o.assignee && (o.shipType==='negi' || items.some(it=>/ねぎ|ネギ|葱/.test(it.name)))) o.assignee='森下';
   if(!old) o.history.push({at:now(),by:me||'（名前未設定）',to:o.status+'（登録）'});
   else if(old.status!==o.status) o.history.push({at:now(),by:me||'（名前未設定）',to:o.status});
   $('save').disabled=true; $('save').textContent='保存中…';
@@ -618,7 +618,7 @@ function replyImage(o){
   // 宅急便情報記入欄
   const bx=W/2+10; let yy=bottom+50;
   txt('宅急便情報記入欄',bx,yy,19,{b:1}); yy+=38;
-  const carrier=o.shipType==='冷蔵'?'佐川急便 クール便（冷蔵）':o.shipType==='冷凍'?'佐川急便 クール便（冷凍）':o.shipType==='negi'?'佐川急便（森発送）':'佐川急便';
+  const carrier=o.shipType==='冷蔵'?'佐川急便 クール便（冷蔵）':o.shipType==='冷凍'?'佐川急便 クール便（冷凍）':o.shipType==='negi'?'佐川急便（森下発送）':'佐川急便';
   const box=(label,val)=>{ txt(label,bx,yy,16,{c:'#555'}); txt('【',bx+120,yy,18); txt(val,bx+140,yy,19,{c:'#1a3fa0',b:1}); txt('】',W-pad-20,yy,18); yy+=38; };
   box('配送業者名',carrier); box('問合せNO',o.tracking||''); box('店着日時',o.arrival?fmtJ(o.arrival):'');
   txt('配送時間指定（該当欄に◯）',bx,yy,16,{c:'#555'}); yy+=32;
