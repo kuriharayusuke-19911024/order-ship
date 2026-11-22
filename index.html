@@ -257,6 +257,9 @@ const STEP_LABEL = ['発送を依頼する','発送した','請求した','入�
 let orders = JSON.parse(localStorage.getItem('orders')||'[]');
 let pending = JSON.parse(localStorage.getItem('pending')||'[]');
 let me = localStorage.getItem('me')||'';
+let appKey = localStorage.getItem('appKey')||'';
+function askKey(msg){ const k=prompt(msg||'アプリの暗証番号を入力してください'); if(k===null) return false; appKey=k.trim(); localStorage.setItem('appKey',appKey); return true; }
+async function getJson(url){ let r=await fetch(url+'&key='+encodeURIComponent(appKey)); let j=await r.json(); if(j.error==='unauthorized'){ if(!askKey('暗証番号が必要です。アプリの暗証番号を入力してください')) throw new Error('暗証番号が未入力です'); r=await fetch(url+'&key='+encodeURIComponent(appKey)); j=await r.json(); if(j.error==='unauthorized') { appKey=''; localStorage.removeItem('appKey'); throw new Error('暗証番号が違います'); }; } return j; }
 let filter = 'all', pendingFile = null;
 let master = JSON.parse(localStorage.getItem('master')||'{"settings":{},"products":[],"ship":[]}');
 const ZONES = ['南九州','北九州','四国','中国','関西','北陸','東海','信越','関東','南東北','北東北','北海道'];
@@ -283,7 +286,7 @@ function calcItems(items){
 }
 async function loadMaster(){
   if(!API_URL) return;
-  try{ const r=await fetch(API_URL+'?action=master&t='+Date.now()); const j=await r.json(); if(j.products){ master=j; localStorage.setItem('master',JSON.stringify(master)); renderProdList(); if(!$('form').hidden) fillShipUI(); } }catch(e){ console.error(e); }
+  try{ const j=await getJson(API_URL+'?action=master&t='+Date.now()); if(j.products){ master=j; localStorage.setItem('master',JSON.stringify(master)); renderProdList(); if(!$('form').hidden) fillShipUI(); } }catch(e){ console.error(e); }
 }
 function renderProdList(){
   const names=new Set(master.products.map(p=>p.name));
@@ -328,20 +331,23 @@ $('me').onchange = e=>{ me=e.target.value; localStorage.setItem('me',me); render
 
 // ===== 同期（GAS） =====
 async function api(body){
-  const r = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)});
-  const j = await r.json(); if(j.error) throw new Error(j.error); return j;
+  body.key = appKey;
+  let r = await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)});
+  let j = await r.json();
+  if(j.error==='unauthorized'){ if(!askKey('暗証番号が必要です。アプリの暗証番号を入力してください')) throw new Error('暗証番号が未入力です'); body.key=appKey; r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)}); j=await r.json(); if(j.error==='unauthorized') { appKey=''; localStorage.removeItem('appKey'); throw new Error('暗証番号が違います'); }; }
+  if(j.error) throw new Error(j.error); return j;
 }
 async function pull(){
   if(!API_URL){ $('noapi').hidden=false; setSync('','この端末のみ'); return; }
   setSync('busy','同期中…');
   try{
-    const r = await fetch(API_URL+'?action=list&t='+Date.now()); const j = await r.json();
+    const j = await getJson(API_URL+'?action=list&t='+Date.now());
     const map = new Map(orders.map(o=>[o.id,o]));
     (j.orders||[]).forEach(ro=>{ const lo=map.get(ro.id); if(!lo || (ro.updatedAt>lo.updatedAt && !pending.includes(ro.id))) map.set(ro.id,ro); });
     orders=[...map.values()]; persist(); render();
     await pushPending();
     setSync('ok','同期済み '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}));
-  }catch(e){ console.error(e); setSync('ng','同期できません（オフライン？）'); }
+  }catch(e){ console.error(e); setSync('ng', /暗証番号/.test(e.message)? e.message+'（画面を再読み込みすると再入力できます）' : '同期できません（オフライン？）'); }
 }
 async function pushPending(){
   if(!API_URL) return;
