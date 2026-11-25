@@ -319,6 +319,16 @@ const isTodayShip = o=>o.status==='発送依頼' && (!o.due || o.due<=today());
 const isSoon = o=>(o.status==='受注'||o.status==='発送依頼') && o.due && o.due>today() && o.due<=addDays(2);
 const isNoTrack = o=>o.status==='発送済' && !o.tracking && (o.shipDate||'')>=addDays(-7);
 // 要確認：LINEから自動登録されてまだ確認していない／送料・単価が未入力（入金済を除く）
+const hm=t=>t?new Date(t).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+// LINEの送信・確認の状態（カード・詳細用）
+function lineStatus(o){
+  const log=o.lineLog||[]; const n=[...log].reverse().find(l=>l.kind==='notify'); const parts=[];
+  if(n) parts.push(n.ok?`📨 ${esc(n.to||'')}へLINE ${hm(n.at)} ✓`:`📨 LINE送れず ${hm(n.at)}${n.note?'（'+esc(n.note)+'）':''}`);
+  if(o.ackAt) parts.push(`<b style="color:var(--s3)">👀 ${esc(o.assignee||'')} 確認 ${hm(o.ackAt)}</b>`);
+  else if(n && n.ok && o.status==='発送依頼') parts.push(`<span style="color:#d9480f">未確認（「了解」待ち）</span>`);
+  const sh=[...log].reverse().find(l=>l.kind==='shipped'); if(sh) parts.push(`✅ ${esc(sh.by||'')} 発送報告 ${hm(sh.at)}`);
+  return parts.join('　');
+}
 function needsCheck(o){ if(o.deleted||o.status==='入金済') return false; if(o.viaLine && !o.checked) return true; const its=(o.items||[]).filter(i=>i.name); if(!its.length) return true; if(its.some(i=>i.name!=='送料' && !(Number(i.price)>0))) return true; if(!o.shipType) return true; return false; }
 let master = JSON.parse(localStorage.getItem('master')||'{"settings":{},"products":[],"ship":[]}');
 const ZONES = ['南九州','北九州','四国','中国','関西','北陸','東海','信越','関東','南東北','北東北','北海道'];
@@ -500,6 +510,7 @@ function card(o, inTrash){
     <div class="h"><div class="ht"><span class="cust">${esc(o.customer||'（注文元未入力）')}</span><span class="date">注文 ${fmt(o.orderDate)}</span></div>${th}</div>
     ${needsCheck(o)?`<div class="needchk">⚠ 要確認${o.viaLine&&!o.checked?'（LINEから自動登録）':''}${!o.shipType?'・送料未設定':''}${(o.items||[]).some(i=>i.name&&i.name!=='送料'&&!(Number(i.price)>0))?'・単価未入力':''}</div>`:''}
     <div class="items">${esc(itemsText(o))}</div>
+    ${lineStatus(o)?`<div class="meta" style="margin-top:2px">${lineStatus(o)}</div>`:''}
     <div class="meta"><span class="${late?'late':''}">納期 ${fmt(o.due)}${late?'（遅れ）':''}</span><span>担当 ${esc(o.assignee||'未定')}</span>${o.shipTo?`<span>宛先 ${esc(o.shipTo)}</span>`:''}${orderTotal(o)?`<span>${orderTotal(o)}</span>`:''}${o.fileUrl||o.fileData?`<span class="clip">📎 注文書</span>`:''}${o.deliveryUrl?`<span class="clip">📄 納品書</span>`:''}${o.invoiceUrl?`<span class="clip">🧾 請求書</span>`:''}</div>
     <div class="steps">${STATUS.map((s,i)=>`<i class="${i<=si?'done':''}"></i>`).join('')}</div>
     <div class="stline"><span class="stname">${esc(o.status)}</span>${si<4?`<button class="next" data-next="${o.id}">${STEP_LABEL[si]}</button>`:'<span class="stname">完了</span>'}</div>
@@ -547,8 +558,11 @@ async function makeInvoiceFor(list){
 }
 async function notifyLine(o){
   if(!API_URL || !o.assignee) return;
-  try{ const r=await api({action:'notify',order:o,by:me}); toast(r.skipped ? '通知なし：'+r.skipped : `${o.assignee}さんにLINEで通知しました`); }
-  catch(err){ console.error(err); toast('LINE通知できませんでした：'+err.message); }
+  try{ const r=await api({action:'notify',order:o,by:me});
+    (o.lineLog=o.lineLog||[]).push(r.ok && !r.skipped ? {at:r.at||now(),kind:'notify',to:o.assignee,ok:true} : {at:now(),kind:'notify',to:o.assignee,ok:false,note:r.skipped||''});
+    delete o.ackAt; saveOrder(o);
+    toast(r.skipped ? '通知なし：'+r.skipped : `${o.assignee}さんにLINEで通知しました（送信OK）`); }
+  catch(err){ console.error(err); (o.lineLog=o.lineLog||[]).push({at:now(),kind:'notify',to:o.assignee,ok:false,note:err.message}); saveOrder(o); toast('LINE通知できませんでした：'+err.message); }
 }
 
 // ===== 登録・編集 =====
@@ -791,6 +805,7 @@ function openDetail(id){
     <div class="stbox" style="--c:${c}">
       <div class="now">いまのステータス</div><div class="big">${esc(o.status)}</div>
       <div class="stbtns">${si<4?`<button class="next" data-adv="1">${STEP_LABEL[si]}</button>`:''}${si>0?`<button class="back" data-adv="-1">ひとつ戻す</button>`:''}</div>
+      ${(o.lineLog||[]).length?`<div style="margin:6px 0 4px;font-weight:600;font-size:13px">LINEのやりとり</div><div class="hist">${(o.lineLog||[]).slice().reverse().map(l=>`<div>${hm(l.at)}　${l.kind==='notify'?(l.ok?'📨 '+esc(l.to||'')+'さんへ発送依頼を送信（OK）':'📨 送信できず'+(l.note?'：'+esc(l.note):'')):l.kind==='ack'?'👀 '+esc(l.by||'')+'さんが確認（「了解」）':l.kind==='remind'?'⏰ 催促を送信（'+esc(l.to||'')+'）':l.kind==='shipped'?'✅ '+esc(l.by||'')+'さんが発送報告':esc(l.kind)}</div>`).join('')}</div>`:''}
       <div class="hist">${(o.history||[]).slice().reverse().map(h=>`<div>${new Date(h.at).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}　${esc(h.by)} → ${esc(h.to)}${h.changes&&h.changes.length?`<div class="chg">　${h.changes.map(esc).join('／')}</div>`:''}</div>`).join('')||'<div>履歴なし</div>'}</div>
     </div>
     ${needsCheck(o)?`<div class="needchk" style="margin:8px 0">⚠ 要確認：${o.viaLine&&!o.checked?'LINEから自動登録された注文です。内容を確認してください':'送料または単価が未入力です'}</div>`:''}
