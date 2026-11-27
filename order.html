@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ご注文フォーム｜株式会社丹波農商</title>
+<meta name="theme-color" content="#5a3a1c">
+<meta name="robots" content="noindex">
+<style>
+:root{--paper:#f4f3ee;--card:#fff;--ink:#22201b;--sub:#6d685e;--line:#dedad0;--kuri:#6b4423;--kuri-2:#8a5a2b;--danger:#b93a2e;--ok:#3f8f4a}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 "Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+.top{background:var(--kuri);color:#fff;padding:14px 16px}
+.top h1{margin:0;font-size:18px;font-weight:700}
+.top p{margin:4px 0 0;font-size:13px;opacity:.9}
+main{max-width:640px;margin:0 auto;padding:14px 14px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.card h2{font-size:15px;margin:0 0 10px;color:var(--kuri)}
+label{display:block;font-size:13px;color:var(--sub);margin:10px 0 4px}
+label .req{color:var(--danger);font-size:11px;margin-left:4px}
+input[type=text],input[type=tel],input[type=email],input[type=date],input[type=number],select,textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 11px;background:#fff}
+textarea{min-height:70px}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+.item{display:grid;grid-template-columns:1fr 72px 64px 34px;gap:6px;align-items:center;margin-top:6px}
+.item input,.item select{padding:9px 8px}
+.del{border:none;background:transparent;color:var(--sub);font-size:20px;line-height:1}
+.add{border:1px dashed var(--kuri-2);background:#fff;color:var(--kuri-2);border-radius:8px;padding:8px;width:100%;margin-top:8px}
+.btn{width:100%;border:none;background:var(--kuri);color:#fff;border-radius:10px;padding:14px;font-size:17px;font-weight:700;margin-top:6px}
+.btn:disabled{opacity:.5}
+.hint{font-size:12.5px;color:var(--sub);margin:4px 0 0}
+.err{color:var(--danger);font-size:13.5px;margin:8px 0 0;white-space:pre-wrap}
+.done{text-align:center;padding:30px 10px}
+.done .ok{font-size:44px;color:var(--ok)}
+.done h2{margin:6px 0}
+.done p{color:var(--sub)}
+.hp{position:absolute;left:-9999px;top:-9999px;height:0;width:0;opacity:0}
+.foot{text-align:center;font-size:12px;color:var(--sub);margin-top:20px}
+</style>
+</head>
+<body>
+<div class="top"><h1>ご注文フォーム</h1><p>株式会社丹波農商（丹波栗・岩津ねぎ ほか）</p></div>
+<main>
+<form id="f" autocomplete="on">
+  <div class="card">
+    <h2>お届け先</h2>
+    <label>店名・会社名（個人の方はお名前）<span class="req">必須</span></label>
+    <input type="text" id="shop" required placeholder="例：日本料理 ○○">
+    <label>ご担当者名</label>
+    <input type="text" id="contact" placeholder="例：山田">
+    <label>電話番号<span class="req">必須</span></label>
+    <input type="tel" id="tel" required placeholder="例：078-000-0000">
+    <label>郵便番号<span class="req">必須</span></label>
+    <input type="tel" id="zip" required placeholder="例：650-0001" inputmode="numeric">
+    <p class="hint">郵便番号を入れると住所が自動で入ります</p>
+    <label>住所（番地・建物名まで）<span class="req">必須</span></label>
+    <input type="text" id="address" required placeholder="例：兵庫県神戸市中央区○○1-2-3 ○○ビル1F">
+    <label>お届け先の名前が上と違う場合</label>
+    <input type="text" id="shipTo" placeholder="例：○○店 御中">
+    <label>メールアドレス（任意）</label>
+    <input type="email" id="email" placeholder="控えが必要な場合">
+  </div>
+
+  <div class="card">
+    <h2>ご注文内容</h2>
+    <div id="items"></div>
+    <button type="button" class="add" id="add">＋ 商品を追加</button>
+    <p class="hint">一覧にない商品は、商品名を直接入力してください。kg単位の商品は合計kgを数量に入れてください（例：岩津ねぎ 3kg箱×2 → 6）</p>
+    <div class="row">
+      <div><label>お届け希望日</label><input type="date" id="due"></div>
+      <div><label>時間指定</label><select id="slot"><option value="">指定なし</option></select></div>
+    </div>
+    <label>備考（のし・ご要望など）</label>
+    <textarea id="memo"></textarea>
+  </div>
+
+  <div class="hp"><label>website</label><input type="text" id="website" tabindex="-1" autocomplete="off"></div>
+  <button class="btn" id="send" type="submit">この内容で注文する</button>
+  <div class="err" id="err"></div>
+  <p class="hint" style="margin-top:10px">送信後、担当者が内容を確認してから発送手配いたします。</p>
+</form>
+
+<div class="card done" id="done" hidden>
+  <div class="ok">✓</div>
+  <h2>ご注文を受け付けました</h2>
+  <p id="doneNo"></p>
+  <p>担当者が確認のうえ、発送の手配をいたします。<br>ありがとうございます。</p>
+  <button type="button" class="btn" onclick="location.reload()">続けて注文する</button>
+</div>
+<div class="foot">株式会社丹波農商　TEL 050-8890-8997</div>
+</main>
+<script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbygQB1AB_PSgpIQM1Kzf_hxN8vwmDmEbMqwM_GGr8GuQCfUEFqDhenZLnGC2JuMDg5V/exec';
+const $ = id=>document.getElementById(id);
+let products=[]; let slots=['午前中','12-14時','14-16時','16-18時'];
+
+function itemRow(v){
+  const d=document.createElement('div'); d.className='item';
+  const opts='<option value="">商品を選ぶ</option>'+products.map(p=>'<option value="'+esc(p.name)+'" data-unit="'+esc(p.unit||'')+'">'+esc(p.name)+(p.unit?'（'+esc(p.unit)+'）':'')+'</option>').join('')+'<option value="__other">その他（入力）</option>';
+  d.innerHTML='<div><select class="sel">'+opts+'</select><input type="text" class="other" placeholder="商品名を入力" hidden style="margin-top:4px"></div><input type="number" class="qty" min="0" step="0.5" placeholder="数量" inputmode="decimal"><input type="text" class="unit" placeholder="単位"><button type="button" class="del" title="削除">×</button>';
+  const sel=d.querySelector('.sel'), other=d.querySelector('.other'), unit=d.querySelector('.unit');
+  sel.addEventListener('change',()=>{ const o=sel.selectedOptions[0]; other.hidden=sel.value!=='__other'; unit.value=o?(o.dataset.unit||''):''; if(sel.value==='__other') other.focus(); });
+  d.querySelector('.del').addEventListener('click',()=>{ d.remove(); if(!$('items').children.length) $('items').appendChild(itemRow()); });
+  if(v){ sel.value=v.name; }
+  return d;
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function items(){
+  return [...$('items').querySelectorAll('.item')].map(d=>{ const sel=d.querySelector('.sel'); const name=sel.value==='__other'?d.querySelector('.other').value.trim():sel.value; return {name:name, qty:Number(d.querySelector('.qty').value)||0, unit:d.querySelector('.unit').value.trim()}; }).filter(i=>i.name && i.qty>0);
+}
+$('add').addEventListener('click',()=>$('items').appendChild(itemRow()));
+
+// 郵便番号 → 住所（zipcloud）
+let zipTimer=null;
+$('zip').addEventListener('input',()=>{ const z=$('zip').value.replace(/[^0-9]/g,''); if(z.length!==7) return; clearTimeout(zipTimer); zipTimer=setTimeout(()=>{
+  const cb='zc'+Date.now(); window[cb]=j=>{ const r=(j.results||[])[0]; if(r && !$('address').value.trim()){ $('address').value=r.address1+r.address2+r.address3; $('address').focus(); } delete window[cb]; };
+  const s=document.createElement('script'); s.src='https://zipcloud.ibsnet.co.jp/api/search?zipcode='+z+'&callback='+cb; document.body.appendChild(s);
+},200); });
+
+async function init(){
+  try{ const j=await (await fetch(API_URL+'?action=formdata&t='+Date.now())).json(); if(j.products) products=j.products; if(j.slots) slots=j.slots; }catch(_){ }
+  $('slot').innerHTML='<option value="">指定なし</option>'+slots.map(s=>'<option>'+s+'</option>').join('');
+  $('items').appendChild(itemRow());
+  const q=new URLSearchParams(location.search); if(q.get('shop')) $('shop').value=q.get('shop');
+  const dft=new Date(Date.now()+3*86400000); $('due').min=new Date().toISOString().slice(0,10);
+}
+$('f').addEventListener('submit', async ev=>{
+  ev.preventDefault(); $('err').textContent='';
+  const form={shop:$('shop').value.trim(), contact:$('contact').value.trim(), tel:$('tel').value.trim(), zip:$('zip').value.trim(), address:$('address').value.trim(), shipTo:$('shipTo').value.trim(), email:$('email').value.trim(), due:$('due').value, slot:$('slot').value, memo:$('memo').value.trim(), items:items(), website:$('website').value};
+  if(!form.items.length){ $('err').textContent='商品と数量を入力してください'; return; }
+  $('send').disabled=true; $('send').textContent='送信中…';
+  try{
+    const r=await (await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'order',form:form})})).json();
+    if(r.error) throw new Error(r.error);
+    $('f').hidden=true; $('done').hidden=false; $('doneNo').textContent='受付番号：'+(r.no||''); window.scrollTo(0,0);
+  }catch(e){ $('err').textContent='送信できませんでした：'+e.message+'\nお手数ですが、お電話（050-8890-8997）でもご注文いただけます。'; $('send').disabled=false; $('send').textContent='この内容で注文する'; }
+});
+init();
+</script>
+</body>
+</html>
