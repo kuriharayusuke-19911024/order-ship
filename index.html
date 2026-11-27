@@ -264,6 +264,9 @@ a{color:var(--kuri-2)}
       <div class="f"><label>対象月（発送日で絞り込み）</label><div style="display:flex;gap:8px;align-items:center"><input type="month" id="invMonth" style="flex:1"><label style="display:flex;align-items:center;gap:4px;font-size:13.5px;white-space:nowrap"><input type="checkbox" id="invAll">全期間</label></div></div>
       <div class="f"><div style="font-size:13.5px;color:var(--sub)">選んだ月に発送した「発送済」で未請求の注文を、注文元ごとにまとめて1枚の請求書にします（発送日・納期が未入力の注文はどの月でも表示）。作成後は「請求済」になります。</div></div>
       <div id="invList"></div>
+      <h3 style="margin:18px 0 6px;font-size:15px">🧾 請求書の控え（発行済）</h3>
+      <div style="font-size:12.5px;color:var(--sub);margin-bottom:6px">PDFを開く／どう送ったかを記録できます。メール下書きは月初の自動処理で作られます。</div>
+      <div id="invLog">読み込み中…</div>
     </div>
   </div>
 </div>
@@ -841,7 +844,26 @@ function renderStat(j){
 }
 // ===== 月末請求 =====
 $('mPrev').onclick=()=>shiftMonth(-1); $('mNext').onclick=()=>shiftMonth(1);
-$('openInv').onclick=()=>{ if(!$('invMonth').value){ const d=new Date(); $('invMonth').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); } renderInv(); $('inv').hidden=false; };
+$('openInv').onclick=()=>{ if(!$('invMonth').value){ const d=new Date(); $('invMonth').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); } renderInv(); $('inv').hidden=false; renderInvLog(); };
+async function renderInvLog(){
+  const box=$('invLog'); if(!API_URL){ box.textContent='（GAS未設定）'; return; }
+  try{
+    const j=await getJson(API_URL+'?action=invoices'); const list=j.invoices||[];
+    if(!list.length){ box.innerHTML='<div class="empty">まだ請求書はありません</div>'; return; }
+    box.innerHTML=list.map(v=>{
+      const st = v.method ? `<span style="color:var(--s3)">✅ ${esc(v.method)}${v.sentAt?' '+fmt(v.sentAt):''}${v.sentTo?' → '+esc(v.sentTo):''}</span>` : (v.draft.startsWith('作成済') ? `<span style="color:var(--s4)">✉ ${esc(v.draft)}（未送信）</span>` : `<span style="color:var(--sub)">${esc(v.draft||'未送付')}</span>`);
+      return `<div class="inv-row" style="flex-wrap:wrap"><div class="n"><b>${esc(v.customer)}</b><span>${esc(v.no)}　発行 ${fmt(v.date)}　${v.orderIds.length}件</span><span>${st}</span>${v.memo?`<span>${esc(v.memo)}</span>`:''}</div><div class="amt">${yen(v.total)}</div><div style="display:flex;gap:6px"><a class="next" style="--c:var(--s5);text-decoration:none" href="${esc(v.url)}" target="_blank" rel="noopener">PDF</a><button class="next" style="--c:var(--s3)" data-sent="${esc(v.no)}">${v.method?'送付記録を直す':'送付済にする'}</button></div></div>`;
+    }).join('');
+    box.querySelectorAll('[data-sent]').forEach(b=>b.onclick=async()=>{
+      const v=list.find(x=>x.no===b.dataset.sent);
+      const method=prompt('どうやって送りましたか？（メール／LINE／郵送／手渡し／FAX など）', v.method||'メール'); if(method===null) return;
+      const sentAt=prompt('送った日（YYYY-MM-DD）', v.sentAt||today()); if(sentAt===null) return;
+      const sentTo=prompt('送り先（メールアドレスや相手の名前）', v.sentTo||(v.draft.match(/→ (\S+)/)||[])[1]||''); if(sentTo===null) return;
+      const memo=prompt('メモ（任意）', v.memo||''); if(memo===null) return;
+      try{ const r=await api({action:'invsent',no:v.no,method,sentAt,sentTo,memo}); if(r.error) throw new Error(r.error); toast('送付記録を保存しました'); renderInvLog(); }catch(e){ toast('保存できませんでした：'+e.message); }
+    });
+  }catch(e){ box.innerHTML='<div class="empty">読み込めませんでした：'+esc(e.message)+'</div>'; }
+}
 $('invMonth').addEventListener('change',renderInv); $('invAll').addEventListener('change',renderInv);
 function renderInv(){
   const ym=$('invMonth').value, all=$('invAll').checked;
