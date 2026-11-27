@@ -799,6 +799,7 @@ function openDetail(id){
       <button class="ghost" id="dReplyLine" style="padding:7px 12px;font-size:13.5px">📤 返信画像をLINEで受け取る</button>
       <button class="ghost" id="dReply" style="padding:7px 12px;font-size:13.5px">📝 返信画像（この端末で）</button>
       <button class="ghost" id="dLabel" style="padding:7px 12px;font-size:13.5px">🏷 宛名ラベルPDF</button>
+      <button class="ghost" id="dSagawa" style="padding:7px 12px;font-size:13.5px">🚚 佐川CSV</button>
       ${o.invoiceUrl?`<a href="${esc(o.invoiceUrl)}" target="_blank" rel="noopener">🧾 請求書 ${esc(o.invoiceNo||'')}</a>`:''}
       ${!o.invoiceUrl&&STATUS.indexOf(o.status)>=2?`<button class="ghost" id="dInv" style="padding:7px 12px;font-size:13.5px">🧾 この注文だけ請求書</button>`:''}
     </div>
@@ -816,9 +817,10 @@ function openDetail(id){
   const dChk=$('dChecked'); if(dChk) dChk.onclick=()=>{ o.checked=true; o.checkedBy=me; saveOrder(o); toast('確認済みにしました'); openDetail(o.id); };
   $('dReply').onclick=()=>replyImage(o);
   $('dReplyLine').onclick=async()=>{ const b=$('dReplyLine'); b.disabled=true; b.textContent='作成中…（20秒ほど）'; try{ const r=await api({action:'replyimg',order:o,by:me}); toast(r.sent?'返信画像をLINEに送りました':'作成しました'); if(!r.sent&&r.url) window.open(r.url,'_blank'); }catch(e){ toast('作成できませんでした：'+e.message); } b.disabled=false; b.textContent='📤 返信画像をLINEで受け取る'; };
+  $('dSagawa').onclick=async()=>{ const b=$('dSagawa'); b.disabled=true; b.textContent='作成中…'; try{ const r=await api({action:'sagawa',order:o}); if(r.error) throw new Error(r.error); window.open(r.url,'_blank'); toast('e飛伝Ⅲで取り込んで印刷してください'); }catch(e){ toast('作成できませんでした：'+e.message); } b.disabled=false; b.textContent='🚚 佐川CSV'; };
   $('dLabel').onclick=async()=>{ const b=$('dLabel'); b.disabled=true; b.textContent='作成中…'; try{ const r=await api({action:'label',order:o}); window.open(r.url,'_blank'); }catch(e){ toast('作成できませんでした：'+e.message); } b.disabled=false; b.textContent='🏷 宛名ラベルPDF'; };
   $('dAgain').onclick=()=>{ const c=Object.assign({},o,{id:'',orderDate:today(),due:'',status:'受注',shipDate:'',tracking:'',arrival:'',deliveryUrl:'',deliveryNo:'',invoiceUrl:'',invoiceNo:'',fileUrl:'',fileId:'',fileName:'',fileType:'',history:[],viaLine:false,checked:false,remindedAt:'',payRemindedAt:''}); $('detail').hidden=true; openForm(c); $('formTitle').textContent='同じ内容で新しく登録'; };
-  if(limited){ ['dEdit','dAgain','dDel','dDeliv','dReply','dReplyLine','dLabel','dInv','dChecked'].forEach(id=>{ const el=$(id); if(el) el.hidden=true; }); }
+  if(limited){ ['dEdit','dAgain','dDel','dDeliv','dReply','dReplyLine','dLabel','dSagawa','dInv','dChecked'].forEach(id=>{ const el=$(id); if(el) el.hidden=true; }); }
   $('dDeliv').onclick=()=>{ if(!(o.items||[]).some(i=>i.name)){ toast('商品が未入力です'); return; } $('dDeliv').disabled=true; $('dDeliv').textContent='作成中…'; makeDelivery(o,true); };
   const dInv=$('dInv'); if(dInv) dInv.onclick=async()=>{ dInv.disabled=true; dInv.textContent='作成中…'; await makeInvoiceFor([o]); openDetail(o.id); };
   $('dDel').onclick=()=>{ $('dConfirm').innerHTML=`<div class="confirm">この注文をゴミ箱に入れますか？（30日間は戻せます）<div class="btns"><button class="ghost danger" id="dYes">削除する</button><button class="ghost" id="dNo">やめる</button></div></div>`;
